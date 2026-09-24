@@ -70,7 +70,11 @@ fn render_doctor(registry: &RuntimeRegistry, json: bool) {
     println!("YuTool {}", report.version);
     println!(
         "Status: {}",
-        if report.healthy { "healthy" } else { "degraded" }
+        if report.healthy {
+            "healthy"
+        } else {
+            "degraded"
+        }
     );
     println!("Platform: {}/{}", report.platform.os, report.platform.arch);
     println!("Capabilities: {}", report.capabilities);

@@ -32,9 +32,15 @@ fn doctor_json_is_machine_readable() {
 fn capabilities_json_contains_runtime_capabilities() {
     let output = run(&["capabilities", "--json"]);
     let json = parse_stdout(&output);
-    let capabilities = json["result"].as_array().expect("result should be an array");
+    let capabilities = json["result"]
+        .as_array()
+        .expect("result should be an array");
 
-    assert!(capabilities.iter().any(|item| item["id"] == "runtime.doctor"));
+    assert!(
+        capabilities
+            .iter()
+            .any(|item| item["id"] == "runtime.doctor")
+    );
     assert!(
         capabilities
             .iter()
@@ -47,7 +53,9 @@ fn capabilities_json_contains_runtime_capabilities() {
 fn engine_list_json_contains_built_in_runtime() {
     let output = run(&["engine", "list", "--json"]);
     let json = parse_stdout(&output);
-    let engines = json["result"].as_array().expect("result should be an array");
+    let engines = json["result"]
+        .as_array()
+        .expect("result should be an array");
 
     assert_eq!(engines.len(), 1);
     assert_eq!(engines[0]["id"], "yu-runtime");

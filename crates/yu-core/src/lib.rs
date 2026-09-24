@@ -64,7 +64,10 @@ impl RuntimeRegistry {
             provider: EngineProvider::BuiltIn,
             state: EngineState::Ready,
             version: Some(env!("CARGO_PKG_VERSION").to_owned()),
-            capabilities: capabilities.iter().map(|capability| capability.id.clone()).collect(),
+            capabilities: capabilities
+                .iter()
+                .map(|capability| capability.id.clone())
+                .collect(),
         }];
 
         Self {
