@@ -5,7 +5,9 @@ use std::{
     process::{ExitCode, Termination},
 };
 use yu_capability_image::{ImageEngine, ImageErrorKind, ImageOperationError, ResizeRequest};
-use yu_core::{EngineDescriptor, ResolveError, ResolveErrorKind, RuntimeRegistry, SCHEMA_VERSION};
+use yu_core::{
+    EngineDescriptor, ErrorCode, ErrorEnvelope, ResultEnvelope, RuntimeRegistry, YuError,
+};
 use yu_engine_image_rs::{ENGINE_ID as RASTER_ENGINE_ID, RustImageEngine};
 
 #[derive(Debug, Parser)]
@@ -73,52 +75,6 @@ enum ImageCommand {
     },
 }
 
-#[derive(Debug, Serialize)]
-struct EngineRef<'a> {
-    id: &'a str,
-    provider: yu_core::EngineProvider,
-    version: Option<&'a str>,
-}
-
-impl<'a> From<&'a EngineDescriptor> for EngineRef<'a> {
-    fn from(engine: &'a EngineDescriptor) -> Self {
-        Self {
-            id: &engine.id,
-            provider: engine.provider,
-            version: engine.version.as_deref(),
-        }
-    }
-}
-
-#[derive(Debug, Serialize)]
-struct Envelope<'a, T> {
-    schema_version: &'static str,
-    operation: &'static str,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    engine: Option<EngineRef<'a>>,
-    result: T,
-    warnings: Vec<String>,
-}
-
-#[derive(Debug, Serialize)]
-struct ErrorEnvelope<'a> {
-    schema_version: &'static str,
-    error: StructuredError<'a>,
-}
-
-#[derive(Debug, Serialize)]
-struct StructuredError<'a> {
-    code: &'static str,
-    message: &'a str,
-}
-
-#[derive(Debug)]
-struct AppError {
-    code: &'static str,
-    message: String,
-    exit_code: u8,
-}
-
 fn main() -> impl Termination {
     let cli = Cli::parse();
     let json = cli.json;
@@ -127,12 +83,12 @@ fn main() -> impl Termination {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             render_error(&error, json);
-            ExitCode::from(error.exit_code)
+            ExitCode::from(error.exit_code())
         }
     }
 }
 
-fn run(cli: Cli) -> Result<(), AppError> {
+fn run(cli: Cli) -> Result<(), YuError> {
     let registry = RuntimeRegistry::bootstrap();
 
     match cli.command {
@@ -180,13 +136,7 @@ fn render_doctor(registry: &RuntimeRegistry, json: bool) {
     let report = registry.doctor_report();
 
     if json {
-        print_json(&Envelope {
-            schema_version: SCHEMA_VERSION,
-            operation: "runtime.doctor",
-            engine: None,
-            result: report,
-            warnings: Vec::new(),
-        });
+        print_json(&ResultEnvelope::new("runtime.doctor", report));
         return;
     }
 
@@ -209,13 +159,10 @@ fn render_doctor(registry: &RuntimeRegistry, json: bool) {
 
 fn render_capabilities(registry: &RuntimeRegistry, json: bool) {
     if json {
-        print_json(&Envelope {
-            schema_version: SCHEMA_VERSION,
-            operation: "runtime.capabilities",
-            engine: None,
-            result: registry.capabilities(),
-            warnings: Vec::new(),
-        });
+        print_json(&ResultEnvelope::new(
+            "runtime.capabilities",
+            registry.capabilities(),
+        ));
         return;
     }
 
@@ -232,13 +179,7 @@ fn render_capabilities(registry: &RuntimeRegistry, json: bool) {
 
 fn render_engines(registry: &RuntimeRegistry, json: bool) {
     if json {
-        print_json(&Envelope {
-            schema_version: SCHEMA_VERSION,
-            operation: "engine.list",
-            engine: None,
-            result: registry.engines(),
-            warnings: Vec::new(),
-        });
+        print_json(&ResultEnvelope::new("engine.list", registry.engines()));
         return;
     }
 
@@ -263,21 +204,13 @@ fn render_image_info(
     file: PathBuf,
     requested_engine: Option<&str>,
     json: bool,
-) -> Result<(), AppError> {
-    let descriptor = registry
-        .resolve_engine("image.info", requested_engine)
-        .map_err(AppError::from)?;
+) -> Result<(), YuError> {
+    let descriptor = registry.resolve_engine("image.info", requested_engine)?;
     let engine = image_engine(descriptor)?;
-    let result = engine.info(&file).map_err(AppError::from)?;
+    let result = engine.info(&file).map_err(map_image_error)?;
 
     if json {
-        print_json(&Envelope {
-            schema_version: SCHEMA_VERSION,
-            operation: "image.info",
-            engine: Some(descriptor.into()),
-            result,
-            warnings: Vec::new(),
-        });
+        print_json(&ResultEnvelope::new("image.info", result).with_engine(descriptor));
         return Ok(());
     }
 
@@ -297,21 +230,13 @@ fn render_image_resize(
     request: ResizeRequest,
     requested_engine: Option<&str>,
     json: bool,
-) -> Result<(), AppError> {
-    let descriptor = registry
-        .resolve_engine("image.resize", requested_engine)
-        .map_err(AppError::from)?;
+) -> Result<(), YuError> {
+    let descriptor = registry.resolve_engine("image.resize", requested_engine)?;
     let engine = image_engine(descriptor)?;
-    let result = engine.resize(&request).map_err(AppError::from)?;
+    let result = engine.resize(&request).map_err(map_image_error)?;
 
     if json {
-        print_json(&Envelope {
-            schema_version: SCHEMA_VERSION,
-            operation: "image.resize",
-            engine: Some(descriptor.into()),
-            result,
-            warnings: Vec::new(),
-        });
+        print_json(&ResultEnvelope::new("image.resize", result).with_engine(descriptor));
         return Ok(());
     }
 
@@ -329,70 +254,36 @@ fn render_image_resize(
     Ok(())
 }
 
-fn image_engine(descriptor: &EngineDescriptor) -> Result<RustImageEngine, AppError> {
+fn image_engine(descriptor: &EngineDescriptor) -> Result<RustImageEngine, YuError> {
     if descriptor.id == RASTER_ENGINE_ID {
         return Ok(RustImageEngine);
     }
 
-    Err(AppError {
-        code: "ENGINE_UNAVAILABLE",
-        message: format!(
+    Err(YuError::new(
+        ErrorCode::EngineUnavailable,
+        format!(
             "image engine {} is not wired into this build",
             descriptor.id
         ),
-        exit_code: 3,
-    })
+    ))
 }
 
-impl From<ResolveError> for AppError {
-    fn from(error: ResolveError) -> Self {
-        let code = match error.kind {
-            ResolveErrorKind::UnknownEngine | ResolveErrorKind::EngineUnavailable => {
-                "ENGINE_UNAVAILABLE"
-            }
-            ResolveErrorKind::EngineIncompatible => "ENGINE_INCOMPATIBLE",
-            ResolveErrorKind::NoCompatibleEngine => "UNSUPPORTED_CAPABILITY",
-        };
+fn map_image_error(error: ImageOperationError) -> YuError {
+    let code = match error.kind {
+        ImageErrorKind::InvalidInput => ErrorCode::InvalidInput,
+        ImageErrorKind::Unsupported => ErrorCode::UnsupportedCapability,
+        ImageErrorKind::OutputConflict => ErrorCode::OutputConflict,
+        ImageErrorKind::Execution => ErrorCode::ExecutionFailed,
+    };
 
-        Self {
-            code,
-            message: error.message,
-            exit_code: 3,
-        }
-    }
+    YuError::new(code, error.message)
 }
 
-impl From<ImageOperationError> for AppError {
-    fn from(error: ImageOperationError) -> Self {
-        let (code, exit_code) = match error.kind {
-            ImageErrorKind::InvalidInput => ("INVALID_INPUT", 2),
-            ImageErrorKind::Unsupported => ("UNSUPPORTED_CAPABILITY", 3),
-            ImageErrorKind::OutputConflict => ("OUTPUT_CONFLICT", 2),
-            ImageErrorKind::Execution => ("EXECUTION_FAILED", 1),
-        };
-
-        Self {
-            code,
-            message: error.message,
-            exit_code,
-        }
-    }
-}
-
-fn render_error(error: &AppError, json: bool) {
+fn render_error(error: &YuError, json: bool) {
     if json {
-        let envelope = ErrorEnvelope {
-            schema_version: SCHEMA_VERSION,
-            error: StructuredError {
-                code: error.code,
-                message: &error.message,
-            },
-        };
-        let rendered = serde_json::to_string_pretty(&envelope)
-            .expect("serializing YuTool error should not fail");
-        eprintln!("{rendered}");
+        print_json_to_stderr(&ErrorEnvelope::from(error));
     } else {
-        eprintln!("error [{}]: {}", error.code, error.message);
+        eprintln!("error {error}");
     }
 }
 
@@ -400,4 +291,10 @@ fn print_json<T: Serialize>(value: &T) {
     let rendered =
         serde_json::to_string_pretty(value).expect("serializing YuTool output should not fail");
     println!("{rendered}");
+}
+
+fn print_json_to_stderr<T: Serialize>(value: &T) {
+    let rendered =
+        serde_json::to_string_pretty(value).expect("serializing YuTool error should not fail");
+    eprintln!("{rendered}");
 }
