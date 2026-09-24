@@ -1,6 +1,6 @@
 # M1 Freeze Receipt
 
-> Status: **Freeze candidate** until PR #3 is merged.
+> Status: **Frozen**
 
 M1 establishes the first stable YuTool runtime baseline. M2 may extend the runtime, but should not casually break the contracts recorded here.
 
@@ -10,7 +10,9 @@ M1 establishes the first stable YuTool runtime baseline. M2 may extend the runti
 - CLI executable: `yu`
 - Schema version: `1`
 
-The final M1 baseline commit is recorded after PR #3 merges.
+- M1 baseline commit: `c1edcb3d7e1da6527d66246e58b6d2bcc3455216`
+- Freeze PR: #3
+- CI: Rustfmt + Ubuntu/macOS/Windows check, Clippy and tests passed.
 
 ## Crate boundaries
 

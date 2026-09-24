@@ -5,6 +5,7 @@ members = [
     "crates/yu-core",
     "crates/yu-engine-api",
     "crates/yu-engine-image-rs",
+    "crates/yu-engine-manager",
 ]
 resolver = "2"
 
