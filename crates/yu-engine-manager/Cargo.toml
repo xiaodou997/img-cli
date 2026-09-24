@@ -4,7 +4,12 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+flate2.workspace = true
+reqwest.workspace = true
 serde.workspace = true
+sha2.workspace = true
+tar.workspace = true
+zip.workspace = true
 yu-engine-api = { path = "../yu-engine-api" }
 
 [dev-dependencies]

@@ -101,7 +101,7 @@ A manifest must not contain duplicate packages for the same target.
 
 Every managed package requires a SHA-256 digest.
 
-M2 foundation validates the digest format. Actual download hashing/verification is implemented in a later Engine Manager PR before installation is enabled.
+YuTool verifies the downloaded artifact against this digest before extraction or activation. A mismatch aborts installation and the final engine version directory is never activated.
 
 ## Archive kinds
 
@@ -111,7 +111,7 @@ Manifest v1 reserves:
 - `zip`
 - `tar_gz`
 
-Support in the schema does not imply that extraction is already implemented.
+The installer supports all three kinds. Archive extraction is bounded by file-count and total extracted-byte limits.
 
 ## Entrypoint safety
 
@@ -169,3 +169,51 @@ System engines are separate from managed engines.
 YuTool may probe `PATH` for known executable names, but discovering a binary does not transfer ownership to YuTool.
 
 System packages must never be deleted by `yu engine remove`.
+
+
+## Installation pipeline
+
+Managed installation follows this order:
+
+```text
+manifest validate
+      ↓
+target select
+      ↓
+download to YuTool cache/staging
+      ↓
+SHA-256 verify
+      ↓
+safe extract into staging payload
+      ↓
+entrypoint validation
+      ↓
+mark entrypoint executable when required
+      ↓
+atomic rename into engines/<id>/<version>
+```
+
+The final version directory is not created until all earlier steps succeed.
+
+### Archive safety
+
+YuTool rejects:
+
+- absolute archive paths;
+- parent-directory traversal;
+- backslash-based paths in managed archives;
+- ZIP symlinks;
+- TAR symlinks, hardlinks, devices, and other non-file/non-directory entries;
+- archives exceeding configured extraction limits.
+
+### Download safety
+
+The built-in HTTP downloader:
+
+- accepts only `https://` URLs;
+- streams to a staging file rather than buffering the full artifact;
+- enforces a download-size limit;
+- uses a bounded request timeout;
+- verifies SHA-256 before extraction.
+
+No managed artifact is activated before integrity verification succeeds.

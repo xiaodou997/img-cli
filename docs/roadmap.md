@@ -75,10 +75,10 @@ Progress:
 - [x] engine manifest v1 model;
 - [x] platform/architecture matching foundation;
 - [x] managed-engine storage layout;
-- [ ] download staging;
-- [ ] checksum/integrity verification;
-- [ ] safe archive extraction;
-- [ ] atomic activation;
+- [x] download staging;
+- [x] checksum/integrity verification;
+- [x] safe archive extraction;
+- [x] atomic activation;
 - [ ] version discovery;
 - [ ] uninstall;
 - [x] system executable discovery foundation;
