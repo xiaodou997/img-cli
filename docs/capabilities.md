@@ -2,7 +2,7 @@
 
 > This document distinguishes **product capabilities** from **candidate engine implementations**.
 
-The matrix will evolve as implementation spikes and conformance tests are completed.
+The matrix evolves as implementation spikes and conformance tests are completed.
 
 ## Status legend
 
@@ -16,25 +16,42 @@ The matrix will evolve as implementation spikes and conformance tests are comple
 
 ## Bootstrap capabilities
 
-| Capability | v0.1 target | Default implementation direction | Notes |
+| Capability | Status | Default implementation | Notes |
 | --- | --- | --- | --- |
-| \`runtime.doctor\` | Planned | Rust core | Diagnose runtime/engines |
-| \`runtime.capabilities\` | Planned | Rust core | Effective capabilities |
-| \`engine.list\` | Planned | Rust core | Built-in/managed/system |
-| \`engine.install\` | Planned | Engine Manager | Managed engines only |
-| \`engine.remove\` | Planned | Engine Manager | Must not remove system packages |
+| `runtime.doctor` | Supported | Rust core | Diagnose runtime/engines |
+| `runtime.capabilities` | Supported | Rust core | Effective capabilities |
+| `engine.list` | Supported | Rust core | Built-in/managed/system |
+| `engine.install` | Planned | Engine Manager | Managed engines only |
+| `engine.remove` | Planned | Engine Manager | Must not remove system packages |
 
 ## Raster image
 
-| Capability | v0.1 target | Preferred direction | Optional engines |
-| --- | --- | --- | --- |
-| \`image.info\` | Planned | Rust built-in | ImageMagick/libvips later |
-| \`image.resize\` | Planned | Rust built-in | ImageMagick/libvips |
-| \`image.crop\` | Planned | Rust built-in | ImageMagick/libvips |
-| \`image.rotate\` | Planned | Rust built-in | ImageMagick |
-| \`image.convert\` | Planned | Rust built-in where format support exists | ImageMagick/libvips |
+The current built-in engine is:
 
-Candidate Rust libraries include \`image\`, \`imageproc\`, and specialized resize libraries. The exact crate set is not a public product contract.
+```text
+raster-rs
+provider: built_in
+formats: PNG, JPEG, WebP
+```
+
+| Capability | Status | Default implementation | Optional engines |
+| --- | --- | --- | --- |
+| `image.info` | Supported | `raster-rs` / Rust `image` | ImageMagick/libvips later |
+| `image.resize` | Supported | `raster-rs` / Rust `image` | fast_image_resize/ImageMagick/libvips later |
+| `image.crop` | Planned | Rust built-in | ImageMagick/libvips |
+| `image.rotate` | Planned | Rust built-in | ImageMagick |
+| `image.convert` | Planned | Rust built-in where format support exists | ImageMagick/libvips |
+
+Current resize semantics:
+
+- width only: preserve aspect ratio;
+- height only: preserve aspect ratio;
+- width + height: exact target dimensions;
+- output must be a new path;
+- existing output files are rejected rather than overwritten;
+- encoding is selected from the output extension.
+
+The first implementation deliberately favors a small, predictable dependency footprint over maximum format breadth or peak resizing throughput.
 
 ## PSD / PSB
 
@@ -42,12 +59,12 @@ PSD support requires an implementation spike before a built-in engine is selecte
 
 | Capability | v0.1 target | Engine status |
 | --- | --- | --- |
-| \`psd.inspect\` | Planned | engine selection pending |
-| \`psd.tree\` | Planned | engine selection pending |
-| \`psd.layer.list\` | Planned | engine selection pending |
-| \`psd.layer.info\` | Planned | engine selection pending |
-| \`psd.layer.export\` | Planned | engine selection pending |
-| \`psd.render\` | Planned | engine selection pending |
+| `psd.inspect` | Planned | engine selection pending |
+| `psd.tree` | Planned | engine selection pending |
+| `psd.layer.list` | Planned | engine selection pending |
+| `psd.layer.info` | Planned | engine selection pending |
+| `psd.layer.export` | Planned | engine selection pending |
+| `psd.render` | Planned | engine selection pending |
 | layer rename | Future | not frozen |
 | show/hide layer | Future | not frozen |
 | layer opacity | Future | not frozen |
@@ -96,7 +113,7 @@ These are **not v0.1 scope**.
 
 ## Capability discovery
 
-\`yu capabilities --json\` should report what can be executed **now**, given:
+`yu capabilities --json` reports what can be executed **now**, given:
 
 - current platform;
 - built-in features;
@@ -110,7 +127,7 @@ A later operation can still fail if a particular input uses unsupported features
 
 Two engines claiming the same capability should be testable against the same behavioral contract.
 
-For example, implementations of \`image.resize\` should agree on:
+For example, implementations of `image.resize` should agree on:
 
 - argument validation;
 - output-file safety;

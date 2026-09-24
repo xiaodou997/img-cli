@@ -8,7 +8,7 @@ Dates are not committed here. Milestones are capability-based.
 
 **Goal:** freeze the product language and architecture boundaries before implementation.
 
-- [x] Define YuTool / \`yu\` naming
+- [x] Define YuTool / `yu` naming
 - [x] Define project vision
 - [x] Define capability vs engine model
 - [x] Define Built-in / Managed / System engine classes
@@ -16,7 +16,7 @@ Dates are not committed here. Milestones are capability-based.
 - [x] Draft capability matrix
 - [x] Define agent usage rules
 - [x] Record initial engine-strategy ADR
-- [ ] Rename repository from \`img-cli\` to \`yu-tool\`
+- [x] Rename repository from `img-cli` to `yu-tool`
 - [ ] Set repository description/topics
 - [ ] Choose license
 
@@ -30,33 +30,35 @@ Exit criteria:
 
 **Goal:** prove the smallest useful YuTool runtime without external engines.
 
-Planned work:
+Progress:
 
-- Rust workspace bootstrap;
-- \`yu\` CLI executable;
-- core result/error types;
-- capability registry;
-- engine registry;
-- engine resolver;
-- \`yu doctor\`;
-- \`yu capabilities\`;
-- \`yu engine list\`;
-- built-in raster engine;
-- initial \`image.info\`;
-- initial \`image.resize\`;
-- JSON output contract;
-- integration tests.
+- [x] Rust workspace bootstrap
+- [x] `yu` CLI executable
+- [ ] shared core result/error types
+- [x] capability registry
+- [x] engine registry
+- [x] engine resolver
+- [x] `yu doctor`
+- [x] `yu capabilities`
+- [x] `yu engine list`
+- [x] built-in raster engine (`raster-rs`)
+- [x] initial `image.info`
+- [x] initial `image.resize`
+- [x] JSON output contract
+- [x] integration tests
 
-Candidate built-in image stack should be selected through implementation rather than documentation assumptions.
+The first built-in raster implementation uses the Rust `image` crate with a deliberately small default format set: PNG, JPEG, and WebP.
+
+Performance-specialized resizing (for example a future `fast_image_resize` integration) is intentionally deferred until the public resize semantics are proven.
 
 Exit criteria:
 
-\`\`\`bash
+```bash
 yu doctor
 yu capabilities --json
 yu image info input.png --json
 yu image resize input.png --width 1024 -o output.png --json
-\`\`\`
+```
 
 work on supported platforms without ImageMagick, Python, Node, or another optional engine.
 
@@ -79,12 +81,12 @@ Planned work:
 
 CLI target:
 
-\`\`\`bash
+```bash
 yu engine list
 yu engine install <engine>
 yu engine remove <engine>
 yu doctor
-\`\`\`
+```
 
 Important constraint:
 
@@ -143,12 +145,12 @@ Deliverables:
 
 Exit criteria:
 
-\`\`\`bash
+```bash
 yu psd inspect design.psd --json
 yu psd tree design.psd --json
 yu psd layer list design.psd --json
 yu psd layer export design.psd --id <id> -o layer.png --json
-\`\`\`
+```
 
 have a tested engine strategy.
 
@@ -163,7 +165,7 @@ Candidate capabilities:
 - PSD show/hide where supported;
 - opacity changes where supported;
 - safe output replacement;
-- \`--dry-run\`;
+- `--dry-run`;
 - structured change summary;
 - post-operation validation.
 
@@ -195,7 +197,7 @@ Only after the engine/runtime architecture is stable should YuTool expand into a
 
 Potential areas:
 
-\`\`\`text
+```text
 PDF
 media / FFmpeg
 metadata
@@ -204,7 +206,7 @@ OCR
 archives
 documents
 RAW
-\`\`\`
+```
 
 Each new family should begin with:
 
@@ -226,4 +228,4 @@ Do not make v0.1 responsible for:
 - remote/cloud execution;
 - an image-editing GUI.
 
-The first release should prove that **one lightweight runtime can safely discover, resolve, execute, and report local capabilities through \`yu\`.**
+The first release should prove that **one lightweight runtime can safely discover, resolve, execute, and report local capabilities through `yu`.**

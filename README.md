@@ -135,9 +135,9 @@ report structured result
 
 ## Current status
 
-YuTool is in the **design/bootstrap phase**.
+YuTool is in the **M1 runtime implementation phase**.
 
-The current priority is to freeze the capability model, engine model, CLI contract, and the first image/PSD milestone before expanding implementation.
+The Rust runtime, capability/engine registries, Engine Resolver, and the first built-in raster capabilities are now being implemented. The current default raster scope is intentionally small: PNG, JPEG, and WebP.
 
 See:
 
