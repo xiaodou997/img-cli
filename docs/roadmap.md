@@ -70,18 +70,19 @@ M1 is frozen once PR #3 lands and the freeze receipt in `docs/milestones/m1-free
 
 **Goal:** prove optional engine lifecycle management.
 
-Planned work:
+Progress:
 
-- engine manifest format;
-- platform/architecture matching;
-- managed-engine storage layout;
-- download staging;
-- checksum/integrity verification;
-- atomic activation;
-- version discovery;
-- uninstall;
-- system-engine discovery;
-- engine state diagnostics.
+- [x] engine manifest v1 model;
+- [x] platform/architecture matching foundation;
+- [x] managed-engine storage layout;
+- [ ] download staging;
+- [ ] checksum/integrity verification;
+- [ ] safe archive extraction;
+- [ ] atomic activation;
+- [ ] version discovery;
+- [ ] uninstall;
+- [x] system executable discovery foundation;
+- [x] managed engine state diagnostics.
 
 CLI target:
 
