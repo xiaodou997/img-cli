@@ -1,0 +1,206 @@
+# Agent Guide
+
+YuTool is designed so coding agents can discover and invoke local tools without learning every backend-specific CLI.
+
+The public command is:
+
+\`\`\`bash
+yu
+\`\`\`
+
+## Recommended workflow
+
+Agents should use this sequence:
+
+\`\`\`text
+1. discover
+2. inspect
+3. plan
+4. dry-run when available
+5. apply
+6. validate
+7. report
+\`\`\`
+
+## 1. Discover
+
+Before relying on an optional capability:
+
+\`\`\`bash
+yu capabilities --json
+yu engine list --json
+\`\`\`
+
+Use \`yu doctor --json\` when the environment appears unhealthy.
+
+Do not assume ImageMagick, psd-tools, FFmpeg, or another optional engine is installed.
+
+## 2. Inspect
+
+Inspect the input before mutation.
+
+Examples:
+
+\`\`\`bash
+yu image info photo.jpg --json
+yu psd inspect design.psd --json
+yu psd tree design.psd --json
+\`\`\`
+
+Prefer machine-readable output over parsing terminal tables.
+
+## 3. Plan
+
+Use capability and document metadata to decide what operation is safe.
+
+For layered formats, use stable IDs/selectors from YuTool output rather than relying only on display names.
+
+Never assume a layer name is unique.
+
+## 4. Dry-run
+
+When a mutating command supports it:
+
+\`\`\`bash
+yu ... --dry-run --json
+\`\`\`
+
+A dry-run should be preferred when:
+
+- multiple files will change;
+- source overwrite was requested;
+- an operation changes document structure;
+- the selected engine has limited format fidelity.
+
+## 5. Apply
+
+Write to a new output path by default.
+
+Example:
+
+\`\`\`bash
+yu image resize input.jpg --width 1024 -o output.jpg --json
+\`\`\`
+
+Avoid \`--overwrite\` unless preserving the original is unnecessary and the user intent is explicit.
+
+## 6. Validate
+
+Inspect or render the result after meaningful mutation.
+
+Examples:
+
+\`\`\`bash
+yu image info output.jpg --json
+yu psd render output.psd -o preview.png --json
+\`\`\`
+
+Where multiple engines exist, future verification workflows may compare engines for sensitive file formats.
+
+## 7. Report
+
+Report:
+
+- output path;
+- operation performed;
+- selected engine when relevant;
+- warnings;
+- unsupported features encountered.
+
+Do not report success merely because an external process exited; use YuTool's structured result.
+
+## Engine installation
+
+Managed engine installation should be an explicit action.
+
+If a required engine is unavailable, an agent may suggest or request:
+
+\`\`\`bash
+yu engine install <engine-id>
+\`\`\`
+
+Agents should not bypass YuTool and silently install system packages unless the user explicitly requests system-level installation.
+
+## Engine selection
+
+Normal calls should allow YuTool to resolve an engine automatically.
+
+Use an explicit engine only when:
+
+- reproducing a result;
+- debugging;
+- testing compatibility;
+- a particular engine is required for fidelity.
+
+Example:
+
+\`\`\`bash
+yu image resize input.jpg --width 1024 --engine raster-rs -o output.jpg
+\`\`\`
+
+## JSON behavior
+
+In \`--json\` mode:
+
+- parse stdout as the structured result;
+- treat stderr as diagnostics;
+- use \`schema_version\` when present;
+- branch on stable error codes rather than message text.
+
+Do not scrape human tables when JSON output is available.
+
+## Errors
+
+Important initial error categories include:
+
+\`\`\`text
+INVALID_ARGUMENT
+INVALID_INPUT
+UNSUPPORTED_CAPABILITY
+ENGINE_UNAVAILABLE
+ENGINE_INCOMPATIBLE
+EXECUTION_FAILED
+OUTPUT_CONFLICT
+VERIFICATION_FAILED
+\`\`\`
+
+An unavailable capability is different from a corrupt input. Agents should surface that difference to the user.
+
+## PSD guidance
+
+PSD/PSB support can vary significantly by document feature and engine.
+
+Agents should:
+
+- inspect first;
+- preserve the source file;
+- report selected engine;
+- treat fidelity warnings seriously;
+- avoid claiming unsupported text/shape/Smart Object edits succeeded;
+- render/validate after structural changes.
+
+## Security guidance
+
+Do not turn YuTool errors into arbitrary shell execution.
+
+If an engine is missing, prefer YuTool's managed-engine path or explicit user-directed installation instructions.
+
+Do not interpolate file names into shell strings. Use structured command invocation when integrating YuTool programmatically.
+
+## Example agent session
+
+\`\`\`bash
+# Discover
+yu capabilities --json
+
+# Inspect
+yu psd tree poster.psd --json
+
+# Export one selected layer
+yu psd layer export poster.psd --id L0012 -o logo.png --json
+
+# Validate exported file
+yu image info logo.png --json
+\`\`\`
+
+The caller only needs to understand YuTool's interface; engine-specific details remain behind the runtime.
