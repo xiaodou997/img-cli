@@ -1,3 +1,10 @@
+mod installer;
+
+pub use installer::{
+    DEFAULT_MAX_DOWNLOAD_BYTES, DEFAULT_MAX_EXTRACTED_BYTES, DEFAULT_MAX_EXTRACTED_FILES,
+    Downloader, EngineInstaller, HttpDownloader, InstallLimits, InstallReceipt, sha256_file,
+};
+
 use serde::{Deserialize, Serialize};
 use std::{
     env,
@@ -77,11 +84,7 @@ impl EngineManifest {
             ));
         }
 
-        if self.version.trim().is_empty() {
-            return Err(ManagerError::InvalidManifest(
-                "engine version must not be empty".to_owned(),
-            ));
-        }
+        validate_version_segment(&self.version)?;
 
         if self.packages.is_empty() {
             return Err(ManagerError::InvalidManifest(
@@ -96,9 +99,9 @@ impl EngineManifest {
                 ));
             }
 
-            if package.url.trim().is_empty() {
+            if !package.url.starts_with("https://") {
                 return Err(ManagerError::InvalidManifest(
-                    "package url must not be empty".to_owned(),
+                    "package url must use https://".to_owned(),
                 ));
             }
 
@@ -290,6 +293,11 @@ impl EngineManager {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ManagerError {
     InvalidManifest(String),
+    Incompatible(String),
+    AlreadyInstalled(String),
+    Download(String),
+    Integrity(String),
+    Archive(String),
     Environment(String),
     Io(String),
 }
@@ -298,6 +306,11 @@ impl fmt::Display for ManagerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidManifest(message) => write!(f, "invalid engine manifest: {message}"),
+            Self::Incompatible(message) => write!(f, "engine package is incompatible: {message}"),
+            Self::AlreadyInstalled(message) => write!(f, "engine is already installed: {message}"),
+            Self::Download(message) => write!(f, "engine download failed: {message}"),
+            Self::Integrity(message) => write!(f, "engine integrity check failed: {message}"),
+            Self::Archive(message) => write!(f, "engine archive rejected: {message}"),
             Self::Environment(message) => write!(f, "engine manager environment error: {message}"),
             Self::Io(message) => write!(f, "engine manager I/O error: {message}"),
         }
@@ -431,10 +444,28 @@ fn validate_identifier(label: &str, value: &str) -> Result<(), ManagerError> {
     Ok(())
 }
 
+fn validate_version_segment(value: &str) -> Result<(), ManagerError> {
+    if value.is_empty()
+        || value == "."
+        || value == ".."
+        || !value.bytes().all(|byte| {
+            byte.is_ascii_alphanumeric()
+                || matches!(byte, b'.' | b'_' | b'-' | b'+')
+        })
+    {
+        return Err(ManagerError::InvalidManifest(
+            "engine version must be a safe path segment".to_owned(),
+        ));
+    }
+
+    Ok(())
+}
+
 fn validate_relative_entrypoint(value: &str) -> Result<(), ManagerError> {
     let path = Path::new(value);
 
     if value.trim().is_empty()
+        || value.contains('\\')
         || path.is_absolute()
         || path
             .components()
