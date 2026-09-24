@@ -1,0 +1,229 @@
+# Roadmap
+
+This roadmap intentionally prioritizes proving YuTool's runtime model before expanding into many tool categories.
+
+Dates are not committed here. Milestones are capability-based.
+
+## M0 — Documentation bootstrap
+
+**Goal:** freeze the product language and architecture boundaries before implementation.
+
+- [x] Define YuTool / \`yu\` naming
+- [x] Define project vision
+- [x] Define capability vs engine model
+- [x] Define Built-in / Managed / System engine classes
+- [x] Draft CLI contract
+- [x] Draft capability matrix
+- [x] Define agent usage rules
+- [x] Record initial engine-strategy ADR
+- [ ] Rename repository from \`img-cli\` to \`yu-tool\`
+- [ ] Set repository description/topics
+- [ ] Choose license
+
+Exit criteria:
+
+- contributors and coding agents can explain what YuTool is and is not;
+- v0.1 command shape is documented;
+- optional engines are not accidentally treated as hard dependencies.
+
+## M1 — Rust core and first built-in capability
+
+**Goal:** prove the smallest useful YuTool runtime without external engines.
+
+Planned work:
+
+- Rust workspace bootstrap;
+- \`yu\` CLI executable;
+- core result/error types;
+- capability registry;
+- engine registry;
+- engine resolver;
+- \`yu doctor\`;
+- \`yu capabilities\`;
+- \`yu engine list\`;
+- built-in raster engine;
+- initial \`image.info\`;
+- initial \`image.resize\`;
+- JSON output contract;
+- integration tests.
+
+Candidate built-in image stack should be selected through implementation rather than documentation assumptions.
+
+Exit criteria:
+
+\`\`\`bash
+yu doctor
+yu capabilities --json
+yu image info input.png --json
+yu image resize input.png --width 1024 -o output.png --json
+\`\`\`
+
+work on supported platforms without ImageMagick, Python, Node, or another optional engine.
+
+## M2 — Engine Manager foundation
+
+**Goal:** prove optional engine lifecycle management.
+
+Planned work:
+
+- engine manifest format;
+- platform/architecture matching;
+- managed-engine storage layout;
+- download staging;
+- checksum/integrity verification;
+- atomic activation;
+- version discovery;
+- uninstall;
+- system-engine discovery;
+- engine state diagnostics.
+
+CLI target:
+
+\`\`\`bash
+yu engine list
+yu engine install <engine>
+yu engine remove <engine>
+yu doctor
+\`\`\`
+
+Important constraint:
+
+YuTool should not silently invoke Homebrew, apt, winget, sudo, or administrator elevation as part of an unrelated operation.
+
+Exit criteria:
+
+- a managed engine can be installed, verified, activated, listed, used, and removed;
+- a compatible system engine can be discovered without YuTool taking ownership of it.
+
+## M3 — PSD engine spike
+
+**Goal:** select a practical PSD/PSB strategy based on fixtures rather than assumptions.
+
+Build a representative fixture corpus covering, where legally distributable:
+
+- simple pixel layers;
+- nested groups;
+- duplicate layer names;
+- text layers;
+- masks;
+- blend modes;
+- effects;
+- Smart Object metadata;
+- higher bit depth where applicable;
+- PSD and PSB;
+- malformed/edge-case inputs.
+
+Evaluate candidate implementations across:
+
+- parse success;
+- layer-tree fidelity;
+- metadata coverage;
+- layer export;
+- rendering fidelity;
+- PSD vs PSB;
+- round-trip behavior where writing is supported;
+- performance;
+- memory usage;
+- platform/distribution cost;
+- maintenance risk.
+
+Candidate categories include:
+
+- Rust-native PSD implementations;
+- psd-tools;
+- TypeScript/Node PSD implementations where useful;
+- other mature implementations discovered during the spike.
+
+Deliverables:
+
+- benchmark/conformance report;
+- recommended built-in PSD engine, if one is mature enough;
+- recommended compatibility/managed engine, if useful;
+- explicit unsupported/partial capability list.
+
+Exit criteria:
+
+\`\`\`bash
+yu psd inspect design.psd --json
+yu psd tree design.psd --json
+yu psd layer list design.psd --json
+yu psd layer export design.psd --id <id> -o layer.png --json
+\`\`\`
+
+have a tested engine strategy.
+
+## M4 — Safe mutation
+
+**Goal:** introduce modifications without compromising source-file safety.
+
+Candidate capabilities:
+
+- image crop/rotate/convert;
+- PSD layer rename where supported;
+- PSD show/hide where supported;
+- opacity changes where supported;
+- safe output replacement;
+- \`--dry-run\`;
+- structured change summary;
+- post-operation validation.
+
+Any PSD mutation capability must be gated by actual engine conformance results.
+
+## M5 — YuTool Manager
+
+**Goal:** provide a small GUI for runtime/engine management.
+
+Initial GUI scope:
+
+- installed engines;
+- available managed engines;
+- version;
+- provider class;
+- capability list;
+- install/update/remove;
+- health state;
+- disk usage;
+- license/source metadata.
+
+The first Manager is **not** an image editor.
+
+Preferred direction: Tauri sharing the Rust core with the CLI.
+
+## After the runtime is proven
+
+Only after the engine/runtime architecture is stable should YuTool expand into additional capability families.
+
+Potential areas:
+
+\`\`\`text
+PDF
+media / FFmpeg
+metadata
+SVG/vector
+OCR
+archives
+documents
+RAW
+\`\`\`
+
+Each new family should begin with:
+
+1. a capability contract;
+2. engine candidates;
+3. conformance fixtures;
+4. an explicit scope decision.
+
+## Non-goals for the first release
+
+Do not make v0.1 responsible for:
+
+- every image format;
+- Photoshop-level PSD editing;
+- full PDF tooling;
+- video/audio transcoding;
+- OCR;
+- a general plugin marketplace;
+- remote/cloud execution;
+- an image-editing GUI.
+
+The first release should prove that **one lightweight runtime can safely discover, resolve, execute, and report local capabilities through \`yu\`.**
