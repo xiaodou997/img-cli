@@ -5,9 +5,7 @@ use std::{
     process::{ExitCode, Termination},
 };
 use yu_capability_image::{ImageEngine, ImageErrorKind, ImageOperationError, ResizeRequest};
-use yu_core::{
-    EngineDescriptor, ResolveError, ResolveErrorKind, RuntimeRegistry, SCHEMA_VERSION,
-};
+use yu_core::{EngineDescriptor, ResolveError, ResolveErrorKind, RuntimeRegistry, SCHEMA_VERSION};
 use yu_engine_image_rs::{ENGINE_ID as RASTER_ENGINE_ID, RustImageEngine};
 
 #[derive(Debug, Parser)]
@@ -338,7 +336,10 @@ fn image_engine(descriptor: &EngineDescriptor) -> Result<RustImageEngine, AppErr
 
     Err(AppError {
         code: "ENGINE_UNAVAILABLE",
-        message: format!("image engine {} is not wired into this build", descriptor.id),
+        message: format!(
+            "image engine {} is not wired into this build",
+            descriptor.id
+        ),
         exit_code: 3,
     })
 }
@@ -387,8 +388,8 @@ fn render_error(error: &AppError, json: bool) {
                 message: &error.message,
             },
         };
-        let rendered =
-            serde_json::to_string_pretty(&envelope).expect("serializing YuTool error should not fail");
+        let rendered = serde_json::to_string_pretty(&envelope)
+            .expect("serializing YuTool error should not fail");
         eprintln!("{rendered}");
     } else {
         eprintln!("error [{}]: {}", error.code, error.message);

@@ -173,8 +173,7 @@ fn scaled_dimension(
     reference_dimension: u32,
 ) -> Result<u32, ImageOperationError> {
     let numerator = u64::from(source_dimension) * u64::from(target_dimension);
-    let rounded = (numerator + u64::from(reference_dimension) / 2)
-        / u64::from(reference_dimension);
+    let rounded = (numerator + u64::from(reference_dimension) / 2) / u64::from(reference_dimension);
     let rounded = rounded.max(1);
 
     u32::try_from(rounded).map_err(|_| {
@@ -219,12 +218,18 @@ mod tests {
 
     #[test]
     fn width_only_preserves_aspect_ratio() {
-        assert_eq!(target_dimensions(400, 200, Some(100), None).unwrap(), (100, 50));
+        assert_eq!(
+            target_dimensions(400, 200, Some(100), None).unwrap(),
+            (100, 50)
+        );
     }
 
     #[test]
     fn height_only_preserves_aspect_ratio() {
-        assert_eq!(target_dimensions(400, 200, None, Some(50)).unwrap(), (100, 50));
+        assert_eq!(
+            target_dimensions(400, 200, None, Some(50)).unwrap(),
+            (100, 50)
+        );
     }
 
     #[test]
@@ -238,6 +243,9 @@ mod tests {
     #[test]
     fn missing_dimensions_are_rejected() {
         let error = target_dimensions(400, 200, None, None).unwrap_err();
-        assert_eq!(error.kind, yu_capability_image::ImageErrorKind::InvalidInput);
+        assert_eq!(
+            error.kind,
+            yu_capability_image::ImageErrorKind::InvalidInput
+        );
     }
 }
