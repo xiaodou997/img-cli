@@ -1,0 +1,8 @@
+[package]
+name = "yu-engine-image-rs"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+image.workspace = true
+yu-capability-image = { path = "../yu-capability-image" }
