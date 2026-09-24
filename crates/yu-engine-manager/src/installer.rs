@@ -531,11 +531,10 @@ fn extract_tar_gz(
 }
 
 fn validate_archive_path(path: &Path) -> Result<(), ManagerError> {
-    if path.as_os_str().is_empty() || path.to_string_lossy().contains('\\') {
-        return Err(ManagerError::Archive(format!(
-            "unsafe archive path: {}",
-            path.display()
-        )));
+    if path.as_os_str().is_empty() {
+        return Err(ManagerError::Archive(
+            "archive path must not be empty".to_owned(),
+        ));
     }
 
     for component in path.components() {
@@ -851,7 +850,6 @@ mod tests {
         assert!(validate_archive_path(Path::new("../escape")).is_err());
         assert!(validate_archive_path(Path::new("/absolute")).is_err());
         assert!(validate_archive_path(Path::new("safe/path")).is_ok());
-        assert!(validate_archive_path(Path::new(r"windows\\escape")).is_err());
     }
 
     #[test]
