@@ -4,9 +4,9 @@
 
 The public executable is:
 
-\`\`\`bash
+```bash
 yu
-\`\`\`
+```
 
 This document defines the intended public command model. Commands marked **planned** are not implemented yet.
 
@@ -14,170 +14,162 @@ This document defines the intended public command model. Commands marked **plann
 
 1. Commands describe capabilities, not backend syntax.
 2. Human-readable output is the default.
-3. Automation-oriented commands should support \`--json\`.
-4. Optional engine selection is explicit through \`--engine\` when needed.
+3. Automation-oriented commands should support `--json`.
+4. Optional engine selection is explicit through `--engine` when needed.
 5. Mutating operations should not overwrite source files by default.
 6. Public command names and structured fields should remain stable once released.
 
 ## Global commands
 
-### \`yu doctor\`
+### `yu doctor`
 
 Diagnose YuTool and engine health.
 
-\`\`\`bash
+```bash
 yu doctor
 yu doctor --json
-\`\`\`
+```
 
-Expected information includes:
-
-- YuTool version;
-- platform/architecture;
-- built-in engine health;
-- managed-engine health;
-- discovered system engines;
-- warnings and missing runtimes.
-
-### \`yu capabilities\`
+### `yu capabilities`
 
 List currently usable capabilities.
 
-\`\`\`bash
+```bash
 yu capabilities
 yu capabilities --json
-\`\`\`
+```
 
-This command reports **effective capabilities on the current machine**, not merely features known to the source code.
+This reports **effective capabilities on the current machine**, not merely features known to the source code.
 
-### \`yu engine list\`
+### `yu engine list`
 
 List engines and their state.
 
-\`\`\`bash
+```bash
 yu engine list
 yu engine list --json
-\`\`\`
+```
 
-Planned states include:
+States include:
 
-- \`ready\`
-- \`not_installed\`
-- \`broken\`
-- \`incompatible\`
-- \`disabled\`
+- `ready`
+- `not_installed`
+- `broken`
+- `incompatible`
+- `disabled`
 
-Planned provider classes:
+Provider classes:
 
-- \`built_in\`
-- \`managed\`
-- \`system\`
+- `built_in`
+- `managed`
+- `system`
 
-### \`yu engine install\`
+### `yu engine install` — planned
 
-Install a managed engine.
-
-\`\`\`bash
+```bash
 yu engine install <engine-id>
-\`\`\`
+```
 
 Installation must be explicit. YuTool must not silently install an engine while executing an unrelated operation.
 
-### \`yu engine remove\`
+### `yu engine remove` — planned
 
-Remove a YuTool-managed engine.
-
-\`\`\`bash
+```bash
 yu engine remove <engine-id>
-\`\`\`
+```
 
 This command must not uninstall a system package that YuTool does not own.
 
 ## Image commands
 
-### \`yu image info\`
+The first built-in raster engine is `raster-rs`.
+
+Its initial default build supports PNG, JPEG, and WebP.
+
+### `yu image info`
 
 Inspect a raster image.
 
-\`\`\`bash
+```bash
 yu image info photo.jpg
 yu image info photo.jpg --json
-\`\`\`
+yu image info photo.jpg --engine raster-rs --json
+```
 
-Potential structured fields:
+Structured result fields currently include:
 
+- path;
 - format;
 - width;
 - height;
-- color model;
-- bit depth where available;
-- frame count where relevant;
+- color type;
+- bit depth per channel;
+- channel count;
+- alpha presence;
 - selected engine.
 
-### \`yu image resize\`
+### `yu image resize`
 
-Resize an image.
+Resize an image to a new file.
 
-\`\`\`bash
+```bash
 yu image resize input.jpg --width 1024 -o output.jpg
 yu image resize input.jpg --height 720 -o output.jpg
 yu image resize input.jpg --width 1024 --engine raster-rs -o output.jpg
-\`\`\`
+```
 
-Source overwrite is not the default.
+Semantics:
 
-### \`yu image crop\`
+- `--width` only: preserve aspect ratio;
+- `--height` only: preserve aspect ratio;
+- both width and height: resize to those exact dimensions;
+- at least one dimension is required;
+- width/height must be greater than zero;
+- output format is inferred from the output extension;
+- the output path must not already exist;
+- source files are never overwritten by this v0.1 operation.
 
-\`\`\`bash
-yu image crop input.png \
-  --x 100 \
-  --y 100 \
-  --width 500 \
-  --height 500 \
-  -o output.png
-\`\`\`
+### `yu image crop` — planned
 
-### \`yu image rotate\`
+```bash
+yu image crop input.png   --x 100   --y 100   --width 500   --height 500   -o output.png
+```
 
-\`\`\`bash
+### `yu image rotate` — planned
+
+```bash
 yu image rotate input.png --degrees 90 -o output.png
-\`\`\`
+```
 
-### \`yu image convert\`
+### `yu image convert` — planned
 
-\`\`\`bash
+```bash
 yu image convert input.png -o output.webp
-\`\`\`
-
-The output format may be inferred from the output extension when unambiguous.
+```
 
 ## PSD commands
 
 PSD is currently a capability namespace rather than a promise about one specific backend.
 
-### \`yu psd inspect\`
+### `yu psd inspect` — planned
 
-Inspect PSD/PSB document-level information.
-
-\`\`\`bash
+```bash
 yu psd inspect design.psd
 yu psd inspect design.psd --json
-\`\`\`
+```
 
-### \`yu psd tree\`
+### `yu psd tree` — planned
 
-Return the layer hierarchy.
-
-\`\`\`bash
+```bash
 yu psd tree design.psd
 yu psd tree design.psd --json
-\`\`\`
+```
 
 A machine-readable result should expose stable selectors independent of duplicate layer names.
 
 Example shape:
 
-\`\`\`json
+```json
 {
   "schema_version": "1",
   "operation": "psd.tree",
@@ -195,58 +187,56 @@ Example shape:
     }
   ]
 }
-\`\`\`
+```
 
-The exact ID implementation is not frozen yet. The requirement is that callers should not be forced to identify a layer only by its display name.
+### `yu psd layer list` — planned
 
-### \`yu psd layer list\`
-
-\`\`\`bash
+```bash
 yu psd layer list design.psd
 yu psd layer list design.psd --json
-\`\`\`
+```
 
-### \`yu psd layer info\`
+### `yu psd layer info` — planned
 
-\`\`\`bash
+```bash
 yu psd layer info design.psd --id L0007
-\`\`\`
+```
 
-Future selectors may include \`--path\` and \`--name\`, but ambiguous names must never silently select an arbitrary layer.
+Future selectors may include `--path` and `--name`, but ambiguous names must never silently select an arbitrary layer.
 
-### \`yu psd layer export\`
+### `yu psd layer export` — planned
 
-\`\`\`bash
+```bash
 yu psd layer export design.psd --id L0007 -o layer.png
-\`\`\`
+```
 
-### \`yu psd render\`
+### `yu psd render` — planned
 
-\`\`\`bash
+```bash
 yu psd render design.psd -o preview.png
-\`\`\`
+```
 
 Rendering fidelity depends on the selected engine and document features. Structured output should report the actual engine used and relevant warnings.
 
 ## Common options
 
-Planned common options:
+Current/planned common options:
 
-\`\`\`text
+```text
 --json
 --engine <engine-id>
---verbose
---quiet
-\`\`\`
+--verbose      (planned)
+--quiet        (planned)
+```
 
-Mutation-oriented commands may additionally support:
+Mutation-oriented commands may later support:
 
-\`\`\`text
+```text
 --dry-run
 --overwrite
-\`\`\`
+```
 
-\`--overwrite\` must be explicit when source or destination conflict would otherwise destroy data.
+`--overwrite` must be explicit when source or destination conflict would otherwise destroy data.
 
 ## Engine selection
 
@@ -262,9 +252,9 @@ An engine being installed does not guarantee compatibility with every input.
 
 ## JSON envelope
 
-For stable automation-oriented results, prefer an envelope similar to:
+Successful capability execution uses a stable envelope direction:
 
-\`\`\`json
+```json
 {
   "schema_version": "1",
   "operation": "image.resize",
@@ -276,37 +266,36 @@ For stable automation-oriented results, prefer an envelope similar to:
   "result": {},
   "warnings": []
 }
-\`\`\`
+```
 
 Do not include terminal decoration or progress output in JSON mode.
 
 ## Structured errors
 
-Suggested shape:
+JSON-mode failures are emitted to stderr.
 
-\`\`\`json
+Example:
+
+```json
 {
   "schema_version": "1",
   "error": {
-    "code": "ENGINE_UNAVAILABLE",
-    "message": "The requested operation requires an unavailable engine.",
-    "details": {
-      "engine": "imagemagick"
-    }
+    "code": "OUTPUT_CONFLICT",
+    "message": "output already exists: output.png"
   }
 }
-\`\`\`
+```
 
-Initial error codes should include at least:
+Initial error codes include:
 
-- \`INVALID_ARGUMENT\`
-- \`INVALID_INPUT\`
-- \`UNSUPPORTED_CAPABILITY\`
-- \`ENGINE_UNAVAILABLE\`
-- \`ENGINE_INCOMPATIBLE\`
-- \`EXECUTION_FAILED\`
-- \`OUTPUT_CONFLICT\`
-- \`VERIFICATION_FAILED\`
+- `INVALID_ARGUMENT`
+- `INVALID_INPUT`
+- `UNSUPPORTED_CAPABILITY`
+- `ENGINE_UNAVAILABLE`
+- `ENGINE_INCOMPATIBLE`
+- `EXECUTION_FAILED`
+- `OUTPUT_CONFLICT`
+- `VERIFICATION_FAILED`
 
 ## Exit codes
 
@@ -316,17 +305,18 @@ Initial mapping:
 | ---: | --- |
 | 0 | success |
 | 1 | execution/runtime failure |
-| 2 | invalid arguments or invalid input |
-| 3 | capability or engine unavailable |
+| 2 | invalid arguments, invalid input, or output conflict |
+| 3 | capability or engine unavailable/incompatible |
 
 More granular error meaning belongs in structured output rather than an excessively large exit-code table.
 
 ## stdout / stderr
 
-- Successful human output: stdout
-- Successful JSON output: stdout
-- warnings/diagnostics: stderr
-- progress UI: stderr or an interactive presentation layer, never mixed into JSON stdout
+- successful human output: stdout;
+- successful JSON output: stdout;
+- warnings/diagnostics: stderr;
+- JSON error envelope: stderr;
+- progress UI: stderr or an interactive presentation layer, never mixed into JSON stdout.
 
 ## Compatibility
 
