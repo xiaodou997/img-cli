@@ -566,8 +566,12 @@ mod tests {
         let executable = root.join(executable_name);
         fs::write(&executable, b"fixture").unwrap();
 
-        let found = find_in_paths(&["yu-fixture"], std::slice::from_ref(&root));
-        assert_eq!(found.as_deref(), Some(executable.as_path()));
+        let found = find_in_paths(&["yu-fixture"], std::slice::from_ref(&root))
+            .expect("fixture executable should be discovered");
+        assert_eq!(
+            fs::canonicalize(found).unwrap(),
+            fs::canonicalize(&executable).unwrap()
+        );
 
         let _ = fs::remove_dir_all(root);
     }
