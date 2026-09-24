@@ -34,7 +34,7 @@ Progress:
 
 - [x] Rust workspace bootstrap
 - [x] `yu` CLI executable
-- [ ] shared core result/error types
+- [x] shared core result/error types
 - [x] capability registry
 - [x] engine registry
 - [x] engine resolver
@@ -61,6 +61,10 @@ yu image resize input.png --width 1024 -o output.png --json
 ```
 
 work on supported platforms without ImageMagick, Python, Node, or another optional engine.
+
+### M1 Freeze
+
+M1 is frozen once PR #3 lands and the freeze receipt in `docs/milestones/m1-freeze.md` records the accepted CLI/protocol baseline and green cross-platform CI.
 
 ## M2 — Engine Manager foundation
 

@@ -6,6 +6,145 @@ pub use yu_engine_api::{EngineDescriptor, EngineProvider, EngineState};
 pub const SCHEMA_VERSION: &str = "1";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct EngineRef {
+    pub id: String,
+    pub provider: EngineProvider,
+    pub version: Option<String>,
+}
+
+impl From<&EngineDescriptor> for EngineRef {
+    fn from(engine: &EngineDescriptor) -> Self {
+        Self {
+            id: engine.id.clone(),
+            provider: engine.provider,
+            version: engine.version.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ResultEnvelope<T> {
+    pub schema_version: &'static str,
+    pub operation: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub engine: Option<EngineRef>,
+    pub result: T,
+    pub warnings: Vec<String>,
+}
+
+impl<T> ResultEnvelope<T> {
+    pub fn new(operation: &'static str, result: T) -> Self {
+        Self {
+            schema_version: SCHEMA_VERSION,
+            operation,
+            engine: None,
+            result,
+            warnings: Vec::new(),
+        }
+    }
+
+    pub fn with_engine(mut self, engine: &EngineDescriptor) -> Self {
+        self.engine = Some(engine.into());
+        self
+    }
+
+    pub fn with_warning(mut self, warning: impl Into<String>) -> Self {
+        self.warnings.push(warning.into());
+        self
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ErrorCode {
+    InvalidArgument,
+    InvalidInput,
+    UnsupportedCapability,
+    EngineUnavailable,
+    EngineIncompatible,
+    ExecutionFailed,
+    OutputConflict,
+    VerificationFailed,
+}
+
+impl ErrorCode {
+    pub const fn exit_code(self) -> u8 {
+        match self {
+            Self::ExecutionFailed | Self::VerificationFailed => 1,
+            Self::InvalidArgument | Self::InvalidInput | Self::OutputConflict => 2,
+            Self::UnsupportedCapability | Self::EngineUnavailable | Self::EngineIncompatible => 3,
+        }
+    }
+}
+
+impl fmt::Display for ErrorCode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let value = match self {
+            Self::InvalidArgument => "INVALID_ARGUMENT",
+            Self::InvalidInput => "INVALID_INPUT",
+            Self::UnsupportedCapability => "UNSUPPORTED_CAPABILITY",
+            Self::EngineUnavailable => "ENGINE_UNAVAILABLE",
+            Self::EngineIncompatible => "ENGINE_INCOMPATIBLE",
+            Self::ExecutionFailed => "EXECUTION_FAILED",
+            Self::OutputConflict => "OUTPUT_CONFLICT",
+            Self::VerificationFailed => "VERIFICATION_FAILED",
+        };
+        f.write_str(value)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct YuError {
+    pub code: ErrorCode,
+    pub message: String,
+}
+
+impl YuError {
+    pub fn new(code: ErrorCode, message: impl Into<String>) -> Self {
+        Self {
+            code,
+            message: message.into(),
+        }
+    }
+
+    pub const fn exit_code(&self) -> u8 {
+        self.code.exit_code()
+    }
+}
+
+impl fmt::Display for YuError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}] {}", self.code, self.message)
+    }
+}
+
+impl Error for YuError {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ErrorEnvelope<'a> {
+    pub schema_version: &'static str,
+    pub error: ErrorBody<'a>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ErrorBody<'a> {
+    pub code: ErrorCode,
+    pub message: &'a str,
+}
+
+impl<'a> From<&'a YuError> for ErrorEnvelope<'a> {
+    fn from(error: &'a YuError) -> Self {
+        Self {
+            schema_version: SCHEMA_VERSION,
+            error: ErrorBody {
+                code: error.code,
+                message: &error.message,
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct CapabilityDescriptor {
     pub id: String,
     pub summary: String,
@@ -54,6 +193,20 @@ impl fmt::Display for ResolveError {
 }
 
 impl Error for ResolveError {}
+
+impl From<ResolveError> for YuError {
+    fn from(error: ResolveError) -> Self {
+        let code = match error.kind {
+            ResolveErrorKind::UnknownEngine | ResolveErrorKind::EngineUnavailable => {
+                ErrorCode::EngineUnavailable
+            }
+            ResolveErrorKind::EngineIncompatible => ErrorCode::EngineIncompatible,
+            ResolveErrorKind::NoCompatibleEngine => ErrorCode::UnsupportedCapability,
+        };
+
+        Self::new(code, error.message)
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct RuntimeRegistry {
@@ -278,5 +431,42 @@ mod tests {
             .unwrap_err();
 
         assert_eq!(error.kind, ResolveErrorKind::UnknownEngine);
+    }
+
+    #[test]
+    fn result_envelope_serializes_stable_schema() {
+        let registry = RuntimeRegistry::bootstrap();
+        let engine = registry.resolve_engine("image.info", None).unwrap();
+        let envelope = ResultEnvelope::new("image.info", "ok").with_engine(engine);
+        let json = serde_json::to_value(envelope).unwrap();
+
+        assert_eq!(json["schema_version"], "1");
+        assert_eq!(json["operation"], "image.info");
+        assert_eq!(json["engine"]["id"], "raster-rs");
+        assert_eq!(json["engine"]["provider"], "built_in");
+        assert_eq!(json["result"], "ok");
+    }
+
+    #[test]
+    fn error_envelope_serializes_stable_error_code() {
+        let error = YuError::new(ErrorCode::OutputConflict, "already exists");
+        let json = serde_json::to_value(ErrorEnvelope::from(&error)).unwrap();
+
+        assert_eq!(json["schema_version"], "1");
+        assert_eq!(json["error"]["code"], "OUTPUT_CONFLICT");
+        assert_eq!(json["error"]["message"], "already exists");
+        assert_eq!(error.exit_code(), 2);
+    }
+
+    #[test]
+    fn resolve_errors_map_to_protocol_errors() {
+        let registry = RuntimeRegistry::bootstrap();
+        let resolve = registry
+            .resolve_engine("image.info", Some("yu-runtime"))
+            .unwrap_err();
+        let error = YuError::from(resolve);
+
+        assert_eq!(error.code, ErrorCode::EngineIncompatible);
+        assert_eq!(error.exit_code(), 3);
     }
 }
