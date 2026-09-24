@@ -103,10 +103,7 @@ impl EngineManifest {
             }
 
             if package.sha256.len() != 64
-                || !package
-                    .sha256
-                    .bytes()
-                    .all(|byte| byte.is_ascii_hexdigit())
+                || !package.sha256.bytes().all(|byte| byte.is_ascii_hexdigit())
             {
                 return Err(ManagerError::InvalidManifest(
                     "package sha256 must be a 64-character hexadecimal digest".to_owned(),
@@ -132,7 +129,9 @@ impl EngineManifest {
     }
 
     pub fn package_for(&self, target: &EngineTarget) -> Option<&EnginePackage> {
-        self.packages.iter().find(|package| package.target == *target)
+        self.packages
+            .iter()
+            .find(|package| package.target == *target)
     }
 }
 
@@ -312,55 +311,61 @@ pub fn default_data_root() -> Result<PathBuf, ManagerError> {
         return Ok(PathBuf::from(path));
     }
 
-    #[cfg(target_os = "windows")]
-    {
-        if let Some(path) = env::var_os("LOCALAPPDATA").filter(|value| !value.is_empty()) {
-            return Ok(PathBuf::from(path).join("YuTool"));
-        }
+    platform_default_data_root()
+}
 
-        return Err(ManagerError::Environment(
-            "LOCALAPPDATA is not available; set YU_DATA_HOME explicitly".to_owned(),
-        ));
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        let home = env::var_os("HOME").filter(|value| !value.is_empty()).ok_or_else(|| {
-            ManagerError::Environment(
-                "HOME is not available; set YU_DATA_HOME explicitly".to_owned(),
-            )
-        })?;
-
-        return Ok(PathBuf::from(home)
-            .join("Library")
-            .join("Application Support")
-            .join("YuTool"));
-    }
-
-    #[cfg(all(unix, not(target_os = "macos")))]
-    {
-        if let Some(path) = env::var_os("XDG_DATA_HOME").filter(|value| !value.is_empty()) {
-            return Ok(PathBuf::from(path).join("yu-tool"));
-        }
-
-        let home = env::var_os("HOME").filter(|value| !value.is_empty()).ok_or_else(|| {
-            ManagerError::Environment(
-                "HOME is not available; set YU_DATA_HOME explicitly".to_owned(),
-            )
-        })?;
-
-        return Ok(PathBuf::from(home)
-            .join(".local")
-            .join("share")
-            .join("yu-tool"));
-    }
-
-    #[cfg(not(any(unix, target_os = "windows")))]
-    {
+#[cfg(target_os = "windows")]
+fn platform_default_data_root() -> Result<PathBuf, ManagerError> {
+    if let Some(path) = env::var_os("LOCALAPPDATA").filter(|value| !value.is_empty()) {
+        Ok(PathBuf::from(path).join("YuTool"))
+    } else {
         Err(ManagerError::Environment(
-            "unsupported platform; set YU_DATA_HOME explicitly".to_owned(),
+            "LOCALAPPDATA is not available; set YU_DATA_HOME explicitly".to_owned(),
         ))
     }
+}
+
+#[cfg(target_os = "macos")]
+fn platform_default_data_root() -> Result<PathBuf, ManagerError> {
+    let home = env::var_os("HOME")
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            ManagerError::Environment(
+                "HOME is not available; set YU_DATA_HOME explicitly".to_owned(),
+            )
+        })?;
+
+    Ok(PathBuf::from(home)
+        .join("Library")
+        .join("Application Support")
+        .join("YuTool"))
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+fn platform_default_data_root() -> Result<PathBuf, ManagerError> {
+    if let Some(path) = env::var_os("XDG_DATA_HOME").filter(|value| !value.is_empty()) {
+        Ok(PathBuf::from(path).join("yu-tool"))
+    } else {
+        let home = env::var_os("HOME")
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| {
+                ManagerError::Environment(
+                    "HOME is not available; set YU_DATA_HOME explicitly".to_owned(),
+                )
+            })?;
+
+        Ok(PathBuf::from(home)
+            .join(".local")
+            .join("share")
+            .join("yu-tool"))
+    }
+}
+
+#[cfg(not(any(unix, target_os = "windows")))]
+fn platform_default_data_root() -> Result<PathBuf, ManagerError> {
+    Err(ManagerError::Environment(
+        "unsupported platform; set YU_DATA_HOME explicitly".to_owned(),
+    ))
 }
 
 pub fn find_on_path(executable_names: &[&str]) -> Option<PathBuf> {
@@ -394,8 +399,7 @@ fn executable_candidates(name: &str) -> Vec<String> {
             return vec![name.to_owned()];
         }
 
-        let extensions = env::var("PATHEXT")
-            .unwrap_or_else(|_| ".COM;.EXE;.BAT;.CMD".to_owned());
+        let extensions = env::var("PATHEXT").unwrap_or_else(|_| ".COM;.EXE;.BAT;.CMD".to_owned());
 
         let mut candidates = vec![name.to_owned()];
         candidates.extend(
@@ -416,9 +420,7 @@ fn executable_candidates(name: &str) -> Vec<String> {
 fn validate_identifier(label: &str, value: &str) -> Result<(), ManagerError> {
     if value.is_empty()
         || !value.bytes().all(|byte| {
-            byte.is_ascii_lowercase()
-                || byte.is_ascii_digit()
-                || matches!(byte, b'-' | b'_' | b'.')
+            byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'-' | b'_' | b'.')
         })
     {
         return Err(ManagerError::InvalidManifest(format!(
