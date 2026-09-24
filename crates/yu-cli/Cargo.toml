@@ -1,0 +1,17 @@
+[package]
+name = "yu-cli"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "yu"
+path = "src/main.rs"
+
+[dependencies]
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+yu-core = { path = "../yu-core" }
+
+[dev-dependencies]
+serde_json.workspace = true
