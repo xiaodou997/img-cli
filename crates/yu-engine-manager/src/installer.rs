@@ -1,6 +1,4 @@
-use crate::{
-    ArchiveKind, EngineManager, EngineManifest, EnginePackage, ManagerError,
-};
+use crate::{ArchiveKind, EngineManager, EngineManifest, EnginePackage, ManagerError};
 use flate2::read::GzDecoder;
 use reqwest::blocking::Client;
 use serde::Serialize;
@@ -58,9 +56,10 @@ impl Downloader for HttpDownloader {
             })?;
         }
 
-        let mut response = self.client.get(url).send().map_err(|error| {
-            ManagerError::Download(format!("cannot download {url}: {error}"))
-        })?;
+        let mut response =
+            self.client.get(url).send().map_err(|error| {
+                ManagerError::Download(format!("cannot download {url}: {error}"))
+            })?;
 
         if !response.status().is_success() {
             return Err(ManagerError::Download(format!(
@@ -172,11 +171,7 @@ where
         }
     }
 
-    pub fn with_limits(
-        manager: EngineManager,
-        downloader: D,
-        limits: InstallLimits,
-    ) -> Self {
+    pub fn with_limits(manager: EngineManager, downloader: D, limits: InstallLimits) -> Self {
         Self {
             manager,
             downloader,
@@ -325,7 +320,10 @@ where
 
 pub fn sha256_file(path: &Path) -> Result<String, ManagerError> {
     let mut file = File::open(path).map_err(|error| {
-        ManagerError::Io(format!("cannot open {} for hashing: {error}", path.display()))
+        ManagerError::Io(format!(
+            "cannot open {} for hashing: {error}",
+            path.display()
+        ))
     })?;
 
     let mut hasher = Sha256::new();
@@ -412,9 +410,9 @@ fn extract_zip(
             .by_index(index)
             .map_err(|error| ManagerError::Archive(format!("cannot read zip entry: {error}")))?;
 
-        let relative = entry.enclosed_name().ok_or_else(|| {
-            ManagerError::Archive(format!("unsafe zip path: {}", entry.name()))
-        })?;
+        let relative = entry
+            .enclosed_name()
+            .ok_or_else(|| ManagerError::Archive(format!("unsafe zip path: {}", entry.name())))?;
         validate_archive_path(&relative)?;
 
         if let Some(mode) = entry.unix_mode()
@@ -575,9 +573,9 @@ fn copy_with_limit<R: Read, W: Write>(
     let mut buffer = [0_u8; 64 * 1024];
 
     loop {
-        let read = reader
-            .read(&mut buffer)
-            .map_err(|error| ManagerError::Archive(format!("cannot read archive entry: {error}")))?;
+        let read = reader.read(&mut buffer).map_err(|error| {
+            ManagerError::Archive(format!("cannot read archive entry: {error}"))
+        })?;
 
         if read == 0 {
             break;
@@ -605,9 +603,8 @@ fn copy_with_limit<R: Read, W: Write>(
 fn make_entrypoint_executable(path: &Path) -> Result<(), ManagerError> {
     use std::os::unix::fs::PermissionsExt;
 
-    let metadata = fs::metadata(path).map_err(|error| {
-        ManagerError::Io(format!("cannot inspect {}: {error}", path.display()))
-    })?;
+    let metadata = fs::metadata(path)
+        .map_err(|error| ManagerError::Io(format!("cannot inspect {}: {error}", path.display())))?;
     let mut permissions = metadata.permissions();
     permissions.set_mode(permissions.mode() | 0o111);
     fs::set_permissions(path, permissions).map_err(|error| {
@@ -626,7 +623,7 @@ fn make_entrypoint_executable(_path: &Path) -> Result<(), ManagerError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{EngineTarget, ManagedLayout, MANIFEST_SCHEMA_VERSION};
+    use crate::{EngineTarget, MANIFEST_SCHEMA_VERSION, ManagedLayout};
     use flate2::{Compression, write::GzEncoder};
     use std::io::{Cursor, Write};
     use tar::{Builder, EntryType, Header};
@@ -694,8 +691,7 @@ mod tests {
     fn zip_fixture(path: &str, contents: &[u8]) -> Vec<u8> {
         let cursor = Cursor::new(Vec::new());
         let mut writer = ZipWriter::new(cursor);
-        let options =
-            SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
+        let options = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
         writer.start_file(path, options).unwrap();
         writer.write_all(contents).unwrap();
         writer.finish().unwrap().into_inner()
@@ -727,10 +723,7 @@ mod tests {
         assert_eq!(fs::read(&receipt.entrypoint).unwrap(), bytes);
         assert_eq!(receipt.sha256, manifest.packages[0].sha256);
 
-        let descriptor = installer
-            .manager()
-            .managed_descriptor(&manifest)
-            .unwrap();
+        let descriptor = installer.manager().managed_descriptor(&manifest).unwrap();
         assert_eq!(descriptor.state, yu_engine_api::EngineState::Ready);
 
         let _ = fs::remove_dir_all(root);

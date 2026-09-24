@@ -448,10 +448,9 @@ fn validate_version_segment(value: &str) -> Result<(), ManagerError> {
     if value.is_empty()
         || value == "."
         || value == ".."
-        || !value.bytes().all(|byte| {
-            byte.is_ascii_alphanumeric()
-                || matches!(byte, b'.' | b'_' | b'-' | b'+')
-        })
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-' | b'+'))
     {
         return Err(ManagerError::InvalidManifest(
             "engine version must be a safe path segment".to_owned(),
