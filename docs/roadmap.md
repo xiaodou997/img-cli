@@ -136,7 +136,7 @@ Progress:
 - [x] psd-tools 1.20.0 reference candidate integration (Python 3.12);
 - [x] TypeScript/Node candidate integration (ag-psd 31.0.2);
 - [x] candidate comparison report v1 (conformance, distribution, maintenance evidence);
-- [ ] controlled performance/memory benchmark report;
+- [x] controlled performance/memory benchmark report v2;
 - [ ] PSD engine strategy decision.
 
 Build a representative fixture corpus covering, where legally distributable:
