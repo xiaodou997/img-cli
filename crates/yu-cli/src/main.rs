@@ -57,23 +57,13 @@ enum EngineCommand {
         manifest: PathBuf,
     },
     /// List installed versions of a managed engine.
-    Versions {
-        engine: String,
-    },
+    Versions { engine: String },
     /// Activate an installed managed-engine version.
-    Activate {
-        engine: String,
-        version: String,
-    },
+    Activate { engine: String, version: String },
     /// Deactivate a managed engine without removing installed versions.
-    Deactivate {
-        engine: String,
-    },
+    Deactivate { engine: String },
     /// Remove an inactive managed-engine version.
-    Remove {
-        engine: String,
-        version: String,
-    },
+    Remove { engine: String, version: String },
 }
 
 #[derive(Debug, Subcommand)]
@@ -242,7 +232,6 @@ fn render_engines(registry: &RuntimeRegistry, json: bool) {
     }
 }
 
-
 fn render_engine_install(manifest_path: &Path, json: bool) -> Result<(), YuError> {
     let manifest = read_manifest(manifest_path)?;
     let manager = EngineManager::discover().map_err(map_manager_error)?;
@@ -309,9 +298,7 @@ fn render_engine_activate(engine_id: &str, version: &str, json: bool) -> Result<
 fn render_engine_deactivate(engine_id: &str, json: bool) -> Result<(), YuError> {
     let manager = EngineManager::discover().map_err(map_manager_error)?;
     let descriptor = managed_descriptor(engine_id);
-    let receipt = manager
-        .deactivate(&descriptor)
-        .map_err(map_manager_error)?;
+    let receipt = manager.deactivate(&descriptor).map_err(map_manager_error)?;
 
     if json {
         print_json(&ResultEnvelope::new("engine.deactivate", receipt));

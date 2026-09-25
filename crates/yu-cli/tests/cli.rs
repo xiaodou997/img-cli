@@ -1,15 +1,15 @@
 use image::{Rgba, RgbaImage};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use yu_engine_manager::{
-    ArchiveKind, Downloader, EngineInstaller, EngineManager, EngineManifest, EnginePackage,
-    EngineTarget, ManagedLayout, ManagerError, MANIFEST_SCHEMA_VERSION,
-};
 use std::{
     fs,
     path::{Path, PathBuf},
     process::{Command, Output},
     time::{SystemTime, UNIX_EPOCH},
+};
+use yu_engine_manager::{
+    ArchiveKind, Downloader, EngineInstaller, EngineManager, EngineManifest, EnginePackage,
+    EngineTarget, MANIFEST_SCHEMA_VERSION, ManagedLayout, ManagerError,
 };
 
 fn run(args: &[&str]) -> Output {
@@ -209,7 +209,6 @@ fn explicit_incompatible_engine_returns_structured_error() {
     let _ = fs::remove_file(input);
 }
 
-
 #[derive(Clone)]
 struct FixtureDownloader {
     bytes: Vec<u8>,
@@ -248,7 +247,9 @@ fn install_fixture_engine(data_home: &Path, version: &str) {
     };
     let manager = EngineManager::new(ManagedLayout::new(data_home), target);
     let installer = EngineInstaller::new(manager, FixtureDownloader { bytes });
-    installer.install(&manifest).expect("fixture install should succeed");
+    installer
+        .install(&manifest)
+        .expect("fixture install should succeed");
 }
 
 #[test]
@@ -258,10 +259,7 @@ fn engine_versions_activate_deactivate_remove_round_trip() {
     install_fixture_engine(&root, "1.0.0");
     install_fixture_engine(&root, "2.0.0");
 
-    let output = run_with_data_home(
-        &["engine", "versions", "fixture-engine", "--json"],
-        &root,
-    );
+    let output = run_with_data_home(&["engine", "versions", "fixture-engine", "--json"], &root);
     let json = parse_stdout(&output);
     assert_eq!(json["operation"], "engine.versions");
     assert_eq!(json["result"].as_array().unwrap().len(), 2);
@@ -282,10 +280,7 @@ fn engine_versions_activate_deactivate_remove_round_trip() {
     let error: Value = serde_json::from_slice(&output.stderr).unwrap();
     assert_eq!(error["error"]["code"], "OUTPUT_CONFLICT");
 
-    let output = run_with_data_home(
-        &["engine", "deactivate", "fixture-engine", "--json"],
-        &root,
-    );
+    let output = run_with_data_home(&["engine", "deactivate", "fixture-engine", "--json"], &root);
     let json = parse_stdout(&output);
     assert_eq!(json["operation"], "engine.deactivate");
     assert_eq!(json["result"]["previous_version"], "2.0.0");
