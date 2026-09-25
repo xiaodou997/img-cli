@@ -127,6 +127,8 @@ Progress:
 - [x] engine-neutral PSD spike harness;
 - [x] fixture corpus schema/provenance rules;
 - [x] initial synthetic malformed fixture;
+- [x] PSD/PSB fixture corpus v1 (pixel layers, groups, duplicate names, text, masks);
+- [x] pinned third-party fixture provenance/license receipts;
 - [x] Rust / psd-tools / TypeScript candidate adapter skeletons;
 - [x] machine-readable per-candidate report model;
 - [ ] representative redistributable PSD/PSB fixture corpus;

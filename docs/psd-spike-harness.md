@@ -54,7 +54,7 @@ The loader rejects:
 - format/extension mismatches;
 - missing fixture files.
 
-The first committed input is intentionally a four-byte, truncated `8BPS` header. It proves that a candidate can be evaluated against an expected parse rejection without introducing third-party fixture licensing into PR #10.
+PR #11 expands the corpus to seven fixtures: PSD and PSB pixel-layer baselines, a nested group, duplicate layer names, a type layer, mask coverage, and the original malformed input. Third-party fixtures are pinned to `psd-tools/psd-tools` commit `f1256273ffb9b39b9efa19d486c86f594c831f42` with the upstream MIT notice committed alongside the corpus.
 
 ## Candidate adapter contract
 
@@ -69,8 +69,12 @@ The observation currently carries the comparison primitives required for the fir
 
 - parse success;
 - width/height;
-- layer count;
-- maximum tree depth.
+- logical layer count;
+- maximum tree depth;
+- layer-name multiset;
+- text-layer count;
+- pixel-mask layer count;
+- vector-mask layer count.
 
 The contract can be extended as the corpus starts testing masks, text, Smart Objects, export, and rendering. New fields should be driven by actual comparison needs rather than one candidate's native API.
 
