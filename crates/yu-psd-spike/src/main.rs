@@ -1,7 +1,10 @@
 use std::env;
 use std::path::Path;
 use std::process;
-use yu_psd_spike::{candidate_adapters, load_candidate_comparison, load_corpus, run_candidate};
+use yu_psd_spike::{
+    candidate_adapters, load_candidate_comparison, load_corpus, run_benchmark, run_candidate,
+    run_layer_export,
+};
 
 fn main() {
     if let Err(message) = run() {
@@ -40,6 +43,39 @@ fn run() -> Result<(), String> {
                 .map_err(|error| error.to_string())?;
             let json = serde_json::to_string_pretty(&snapshot)
                 .map_err(|error| format!("failed to serialize comparison: {error}"))?;
+            println!("{json}");
+            Ok(())
+        }
+        [command, candidate_id, corpus, fixture_id, layer_name] if command == "export-layer" => {
+            let adapter = candidate_adapters()
+                .into_iter()
+                .find(|adapter| adapter.descriptor().id == *candidate_id)
+                .ok_or_else(|| format!("unknown PSD candidate: {candidate_id}"))?;
+            let report = run_layer_export(
+                Path::new(corpus),
+                fixture_id,
+                layer_name,
+                adapter.as_ref(),
+            )
+            .map_err(|error| error.to_string())?;
+            let json = serde_json::to_string_pretty(&report)
+                .map_err(|error| format!("failed to serialize layer export report: {error}"))?;
+            println!("{json}");
+            Ok(())
+        }
+        [command, candidate_id, corpus, benchmark] if command == "benchmark" => {
+            let adapter = candidate_adapters()
+                .into_iter()
+                .find(|adapter| adapter.descriptor().id == *candidate_id)
+                .ok_or_else(|| format!("unknown PSD candidate: {candidate_id}"))?;
+            let report = run_benchmark(
+                Path::new(corpus),
+                Path::new(benchmark),
+                adapter.as_ref(),
+            )
+            .map_err(|error| error.to_string())?;
+            let json = serde_json::to_string_pretty(&report)
+                .map_err(|error| format!("failed to serialize benchmark report: {error}"))?;
             println!("{json}");
             Ok(())
         }
