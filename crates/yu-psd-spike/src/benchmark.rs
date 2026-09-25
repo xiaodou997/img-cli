@@ -132,7 +132,9 @@ pub fn validate_benchmark_plan(plan: &BenchmarkPlan) -> Result<(), CorpusError> 
         )));
     }
     if plan.fixture_id.trim().is_empty() {
-        return Err(CorpusError::new("PSD benchmark fixture_id must not be empty"));
+        return Err(CorpusError::new(
+            "PSD benchmark fixture_id must not be empty",
+        ));
     }
     if plan.warmup_iterations == 0 || plan.measured_iterations == 0 {
         return Err(CorpusError::new(
@@ -190,10 +192,7 @@ pub fn validate_benchmark_plan(plan: &BenchmarkPlan) -> Result<(), CorpusError> 
     Ok(())
 }
 
-pub fn run_benchmark(
-    corpus_path: &Path,
-    plan_path: &Path,
-) -> Result<BenchmarkReport, CorpusError> {
+pub fn run_benchmark(corpus_path: &Path, plan_path: &Path) -> Result<BenchmarkReport, CorpusError> {
     let plan = load_benchmark_plan(plan_path)?;
     let corpus = load_corpus(corpus_path)?;
     let fixture = corpus
@@ -242,11 +241,7 @@ pub fn run_benchmark(
 
         let (warm_parse, layer_export_materialize) = match descriptor.id.as_str() {
             "rust-native" => (
-                run_rawpsd_warm_parse(
-                    &input,
-                    plan.warmup_iterations,
-                    plan.measured_iterations,
-                ),
+                run_rawpsd_warm_parse(&input, plan.warmup_iterations, plan.measured_iterations),
                 unsupported_layer_export(
                     "rawpsd 0.2.2 exposes low-level image data but the M3 adapter does not yet provide a normalized RGBA layer-export contract",
                 ),
@@ -259,14 +254,13 @@ pub fn run_benchmark(
                 Ok(result) => external_reports(result),
                 Err((status, diagnostic)) => external_failure_reports(status, diagnostic),
             },
-            "typescript-psd" => match run_ag_psd_external(
-                &input,
-                plan.warmup_iterations,
-                plan.measured_iterations,
-            ) {
-                Ok(result) => external_reports(result),
-                Err((status, diagnostic)) => external_failure_reports(status, diagnostic),
-            },
+            "typescript-psd" => {
+                match run_ag_psd_external(&input, plan.warmup_iterations, plan.measured_iterations)
+                {
+                    Ok(result) => external_reports(result),
+                    Err((status, diagnostic)) => external_failure_reports(status, diagnostic),
+                }
+            }
             other => {
                 let diagnostic = format!("benchmark implementation missing for {other}");
                 external_failure_reports(BenchmarkStatus::Unsupported, diagnostic)
@@ -415,8 +409,7 @@ fn run_psd_tools_external(
     let python = env::var_os("YU_PSD_TOOLS_PYTHON")
         .filter(|value| !value.is_empty())
         .unwrap_or_else(|| OsString::from("python"));
-    let script =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters/psd_tools_benchmark.py");
+    let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters/psd_tools_benchmark.py");
     let warmup = warmup_iterations.to_string();
     let iterations = measured_iterations.to_string();
 
@@ -596,7 +589,7 @@ fn summarize_samples(samples: &[f64]) -> Option<DurationSummary> {
     let len = sorted.len();
     let min_ms = sorted[0];
     let max_ms = sorted[len - 1];
-    let median_ms = if len % 2 == 0 {
+    let median_ms = if len.is_multiple_of(2) {
         (sorted[len / 2 - 1] + sorted[len / 2]) / 2.0
     } else {
         sorted[len / 2]
@@ -684,8 +677,13 @@ fn validate_measured_duration(
         || report.samples_ms.len() != expected_samples
         || report.summary.is_none()
     {
+        let diagnostic = report
+            .diagnostic
+            .as_deref()
+            .unwrap_or("no diagnostic was returned");
         return Err(CorpusError::new(format!(
-            "PSD benchmark candidate {candidate_id} did not produce {expected_samples} measured samples for {operation}"
+            "PSD benchmark candidate {candidate_id} did not produce {expected_samples} measured samples for {operation}: status={:?}; {diagnostic}",
+            report.status
         )));
     }
     Ok(())
@@ -693,8 +691,8 @@ fn validate_measured_duration(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::RAWPSD_CANDIDATE_VERSION;
+    use super::*;
     use std::path::PathBuf;
 
     fn committed_corpus_path() -> PathBuf {
@@ -702,8 +700,7 @@ mod tests {
     }
 
     fn committed_plan_path() -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../docs/data/psd-benchmark-plan-v1.json")
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/data/psd-benchmark-plan-v1.json")
     }
 
     #[test]
@@ -719,8 +716,7 @@ mod tests {
 
     #[test]
     fn duration_summary_uses_all_samples() {
-        let summary =
-            summarize_samples(&[4.0, 1.0, 3.0, 2.0, 5.0]).expect("summary should exist");
+        let summary = summarize_samples(&[4.0, 1.0, 3.0, 2.0, 5.0]).expect("summary should exist");
         assert_eq!(summary.min_ms, 1.0);
         assert_eq!(summary.median_ms, 3.0);
         assert_eq!(summary.p95_ms, 5.0);
