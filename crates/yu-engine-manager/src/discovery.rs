@@ -1,6 +1,6 @@
 use crate::{
-    EngineManager, EngineTarget, INSTALL_METADATA_FILE, InstalledEngineMetadata,
-    LIFECYCLE_SCHEMA_VERSION, ManagerError, validate_identifier, validate_relative_entrypoint,
+    EngineManager, INSTALL_METADATA_FILE, InstalledEngineMetadata, LIFECYCLE_SCHEMA_VERSION,
+    ManagerError, validate_identifier, validate_relative_entrypoint,
     validate_version_segment,
 };
 use serde::{Deserialize, Serialize};
@@ -727,7 +727,8 @@ mod tests {
     use super::*;
     use crate::lifecycle::write_install_metadata;
     use crate::{
-        ArchiveKind, EngineManifest, EnginePackage, MANIFEST_SCHEMA_VERSION, ManagedLayout,
+        ArchiveKind, EngineManifest, EnginePackage, EngineTarget, MANIFEST_SCHEMA_VERSION,
+        ManagedLayout,
     };
     use std::time::{SystemTime, UNIX_EPOCH};
 
