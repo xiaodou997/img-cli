@@ -1,8 +1,5 @@
 use crate::{EngineManager, ManagerError, validate_identifier};
-use std::{
-    fs::{File, OpenOptions, TryLockError},
-    path::PathBuf,
-};
+use std::fs::{File, OpenOptions, TryLockError};
 
 #[derive(Debug)]
 pub struct EngineMutationLock {
