@@ -890,6 +890,11 @@ mod tests {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/data/psd-benchmark-suite-v2.json")
     }
 
+    fn controlled_report_path() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../docs/data/psd-benchmark-report-v2.json")
+    }
+
     #[test]
     fn committed_benchmark_plan_is_valid_and_non_ranking() {
         let plan = load_benchmark_plan(&committed_plan_path())
@@ -910,6 +915,51 @@ mod tests {
         assert!(!suite.ranking_allowed);
         assert_eq!(suite.canonical_report_platform, "ubuntu-latest");
         assert_eq!(suite.plans.len(), 7);
+    }
+
+    #[test]
+    fn controlled_report_is_non_ranking_and_records_high_bit_divergence() {
+        let content =
+            fs::read_to_string(controlled_report_path()).expect("controlled report should exist");
+        let value: serde_json::Value =
+            serde_json::from_str(&content).expect("controlled report should parse");
+
+        assert_eq!(value["schema_version"], "1");
+        assert_eq!(value["report_id"], "m3-controlled-benchmark-v2");
+        assert_eq!(value["ranking_allowed"], false);
+        assert_eq!(value["source"]["workflow_run_id"], 36135069883_u64);
+
+        let workloads = value["workloads"]
+            .as_array()
+            .expect("controlled report workloads should be an array");
+        assert_eq!(workloads.len(), 7);
+
+        for fixture_id in ["bench-high-bit-rgb", "bench-high-bit-psb"] {
+            let workload = workloads
+                .iter()
+                .find(|workload| workload["fixture_id"] == fixture_id)
+                .expect("high-bit workload should be present");
+            let candidates = workload["candidates"]
+                .as_array()
+                .expect("candidate list should be an array");
+            let psd_tools = candidates
+                .iter()
+                .find(|candidate| candidate["candidate_id"] == "psd-tools")
+                .expect("psd-tools high-bit evidence should exist");
+            let ag_psd = candidates
+                .iter()
+                .find(|candidate| candidate["candidate_id"] == "typescript-psd")
+                .expect("ag-psd high-bit evidence should exist");
+
+            assert_ne!(
+                psd_tools["total_rgba_bytes"], ag_psd["total_rgba_bytes"],
+                "high-bit export must remain explicitly non-equivalent until normalized"
+            );
+            assert_ne!(
+                psd_tools["export_checksum_sha256"], ag_psd["export_checksum_sha256"],
+                "high-bit export fingerprint divergence must remain explicit"
+            );
+        }
     }
 
     #[test]
