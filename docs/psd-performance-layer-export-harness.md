@@ -49,7 +49,7 @@ The adapter opens the document once per export sample and measures `Layer.topil(
 
 ### ag-psd
 
-The adapter reads with `useRawData: true` and uses `getLayerImageData(layer)`. This exercises bitmap decoding without requiring `node-canvas`.
+The adapter reads with `useRawData: true` and uses `getLayerImageData(layer)`. Because that helper still allocates through ag-psd's ImageData hook, the benchmark installs a pure in-memory `Uint8ClampedArray` ImageData shim. This exercises bitmap decoding without requiring `node-canvas` or a native graphics runtime.
 
 ### rawpsd
 
