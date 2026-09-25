@@ -1,6 +1,6 @@
 # CLI Specification
 
-> Status: **Draft contract for bootstrap / v0.1**
+> Status: **M2 frozen baseline / v0.1 evolving**
 
 The public executable is:
 
@@ -8,7 +8,7 @@ The public executable is:
 yu
 ```
 
-This document defines the intended public command model. Commands marked **planned** are not implemented yet.
+This document defines the public command model through the M2 frozen baseline. Commands explicitly marked **planned** belong to later milestones.
 
 ## Design rules
 

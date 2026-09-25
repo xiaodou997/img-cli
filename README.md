@@ -102,8 +102,12 @@ yu doctor
 yu capabilities --json
 
 yu engine list
-yu engine install <engine>
-yu engine remove <engine>
+yu engine info <engine>
+yu engine install --manifest ./engine.json
+yu engine versions <engine>
+yu engine activate <engine> <version>
+yu engine deactivate <engine>
+yu engine remove <engine> <version>
 
 yu image info <file>
 yu image resize <file> --width 1024 -o output.jpg
@@ -135,9 +139,9 @@ report structured result
 
 ## Current status
 
-YuTool is in the **M1 runtime implementation phase**.
+YuTool has completed the **M2 Engine Manager baseline** and is entering **M3 PSD Engine Spike**.
 
-The Rust runtime, capability/engine registries, Engine Resolver, and the first built-in raster capabilities are now being implemented. The current default raster scope is intentionally small: PNG, JPEG, and WebP.
+The current runtime includes the Rust core, the built-in raster engine, verified Managed Engine installation/lifecycle, per-engine mutation locking, and unified Built-in/Managed/System discovery. The built-in raster scope remains intentionally small: PNG, JPEG, and WebP.
 
 See:
 

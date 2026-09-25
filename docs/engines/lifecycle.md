@@ -1,6 +1,6 @@
 # Managed Engine Lifecycle
 
-> Status: **M2 internal lifecycle**
+> Status: **M2 implemented / frozen baseline**
 
 YuTool-managed engines may have multiple versions installed at the same time.
 
@@ -126,15 +126,14 @@ This avoids turning YuTool's remove/activate operations into traversal primitive
 
 ## Public CLI
 
-This lifecycle is internal in PR #6.
+The managed lifecycle is exposed through:
 
-The following remain deferred until PR #7:
+```bash
+yu engine install --manifest <file>
+yu engine versions <engine>
+yu engine activate <engine> <version>
+yu engine deactivate <engine>
+yu engine remove <engine> <version>
+```
 
-\`\`\`bash
-yu engine install
-yu engine activate
-yu engine deactivate
-yu engine remove
-\`\`\`
-
-Before those commands are exposed, the CLI layer will map lifecycle receipts/errors into the frozen YuTool JSON protocol.
+Install and activation remain separate operations. The active version must be switched or deactivated before removal.
