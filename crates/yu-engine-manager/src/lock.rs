@@ -59,6 +59,7 @@ mod tests {
     use crate::{EngineTarget, ManagedLayout};
     use std::{
         fs,
+        path::PathBuf,
         time::{SystemTime, UNIX_EPOCH},
     };
 
