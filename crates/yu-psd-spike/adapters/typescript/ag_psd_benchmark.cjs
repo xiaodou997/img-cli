@@ -59,7 +59,7 @@ if (packageVersion !== expectedVersion) {
 
 // getLayerImageData() allocates through ag-psd's createImageData hook even
 // with useRawData enabled. Supply a pure in-memory ImageData implementation
-// so the benchmark does not require node-canvas or a native graphics runtime.
+// so the RGBA benchmark does not require node-canvas or a native graphics runtime.
 initializeCanvas(
   () => {
     throw new Error("canvas allocation is disabled in the PSD benchmark");
