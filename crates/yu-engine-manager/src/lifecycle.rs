@@ -71,7 +71,6 @@ impl EngineManager {
     ) -> Result<Option<String>, ManagerError> {
         ensure_managed(descriptor)?;
         validate_identifier("engine id", &descriptor.id)?;
-        let _lock = self.acquire_engine_lock(&descriptor.id)?;
 
         let Some(state) = self.read_active_state(&descriptor.id)? else {
             return Ok(None);
@@ -199,6 +198,7 @@ impl EngineManager {
     ) -> Result<DeactivationReceipt, ManagerError> {
         ensure_managed(descriptor)?;
         validate_identifier("engine id", &descriptor.id)?;
+        let _lock = self.acquire_engine_lock(&descriptor.id)?;
 
         let Some(state) = self.read_active_state(&descriptor.id)? else {
             return Ok(DeactivationReceipt {
