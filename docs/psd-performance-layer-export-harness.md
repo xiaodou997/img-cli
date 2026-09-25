@@ -184,3 +184,15 @@ ranking_allowed = false
 ```
 
 and must not turn GitHub-hosted-runner timing into a universal performance ranking.
+
+
+## Controlled report snapshot
+
+The first canonical suite snapshot is committed at:
+
+```text
+docs/data/psd-benchmark-report-v2.json
+docs/psd-controlled-benchmark-report.md
+```
+
+It is sourced from PSD Spike workflow run `36135069883` and remains non-ranking. Standard Rust tests guard the report ID, workload count, source run, and the currently unresolved high-bit-depth export divergence.
