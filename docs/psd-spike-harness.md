@@ -243,6 +243,22 @@ Produce a report for one candidate:
 cargo run -p yu-psd-spike -- run psd-tools fixtures/psd/corpus.json
 ```
 
+Export one layer as an engine-neutral RGBA fingerprint:
+
+```bash
+cargo run -p yu-psd-spike -- \
+  export-layer psd-tools fixtures/psd/corpus.json simple-pixel-layers-psd Слой
+```
+
+Run the benchmark workload:
+
+```bash
+cargo run -p yu-psd-spike -- \
+  benchmark psd-tools fixtures/psd/corpus.json fixtures/psd/benchmark-v1.json
+```
+
+See `docs/psd-benchmark-harness.md` for the measurement policy.
+
 For `psd-tools`, the command runs the pinned reference adapter when its Python environment is available. If the pinned runtime is absent or mismatched, fixture results are `skipped` with an explicit `unavailable` diagnostic.
 
 For `rust-native`, the command runs rawpsd directly in-process:
@@ -271,7 +287,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
-PR #12 adds the three-platform psd-tools reference gate. PR #13 adds the rawpsd candidate gate. PR #14 adds a third Ubuntu/macOS/Windows job for Node.js 22 + ag-psd 31.0.2.
+PR #12 adds the three-platform psd-tools reference gate. PR #13 adds the rawpsd candidate gate. PR #14 adds a third Ubuntu/macOS/Windows job for Node.js 22 + ag-psd 31.0.2. PR #16 extends all three jobs with layer-export and benchmark smoke coverage using the same committed workload.
 
 Candidate jobs require adapter execution without harness errors. A candidate is not required to reach 7/7 unless its observed capability actually matches the corpus.
 
