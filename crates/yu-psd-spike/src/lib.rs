@@ -930,11 +930,7 @@ mod tests {
         failed.sort_unstable();
         assert_eq!(
             failed,
-            vec![
-                "layer-masks",
-                "simple-pixel-layers-psb",
-                "text-layer",
-            ]
+            vec!["layer-masks", "simple-pixel-layers-psb", "text-layer",]
         );
     }
 
