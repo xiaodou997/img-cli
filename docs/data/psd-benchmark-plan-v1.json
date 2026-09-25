@@ -1,0 +1,17 @@
+{
+  "schema_version": "1",
+  "fixture_id": "simple-pixel-layers-psd",
+  "warmup_iterations": 2,
+  "measured_iterations": 7,
+  "candidates": [
+    "rust-native",
+    "psd-tools",
+    "typescript-psd"
+  ],
+  "layer_export_candidates": [
+    "psd-tools",
+    "typescript-psd"
+  ],
+  "ranking_allowed": false,
+  "purpose": "CI smoke and measurement-contract validation only. The committed 14 KB fixture is intentionally too small for a production performance ranking."
+}

@@ -9,6 +9,8 @@ use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 use std::time::Instant;
 
+pub mod benchmark;
+
 pub const CORPUS_SCHEMA_VERSION: &str = "1";
 pub const REPORT_SCHEMA_VERSION: &str = "1";
 pub const PSD_TOOLS_REFERENCE_VERSION: &str = "1.20.0";

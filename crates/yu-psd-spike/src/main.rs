@@ -1,7 +1,11 @@
 use std::env;
+use std::fs;
 use std::path::Path;
 use std::process;
-use yu_psd_spike::{candidate_adapters, load_candidate_comparison, load_corpus, run_candidate};
+use yu_psd_spike::{
+    benchmark::run_benchmark, candidate_adapters, load_candidate_comparison, load_corpus,
+    run_candidate,
+};
 
 fn main() {
     if let Err(message) = run() {
@@ -55,10 +59,28 @@ fn run() -> Result<(), String> {
             println!("{json}");
             Ok(())
         }
+        [command, corpus, plan] if command == "benchmark" => {
+            let report = run_benchmark(Path::new(corpus), Path::new(plan))
+                .map_err(|error| error.to_string())?;
+            let json = serde_json::to_string_pretty(&report)
+                .map_err(|error| format!("failed to serialize benchmark report: {error}"))?;
+            println!("{json}");
+            Ok(())
+        }
+        [command, corpus, plan, output] if command == "benchmark" => {
+            let report = run_benchmark(Path::new(corpus), Path::new(plan))
+                .map_err(|error| error.to_string())?;
+            let json = serde_json::to_string_pretty(&report)
+                .map_err(|error| format!("failed to serialize benchmark report: {error}"))?;
+            fs::write(output, format!("{json}\n"))
+                .map_err(|error| format!("failed to write benchmark report {output}: {error}"))?;
+            println!("wrote PSD benchmark report to {output}");
+            Ok(())
+        }
         _ => Err("invalid arguments".to_owned()),
     }
 }
 
 fn usage() -> &'static str {
-    "usage:\n  yu-psd-spike validate <corpus.json>\n  yu-psd-spike candidates\n  yu-psd-spike comparison <comparison.json>\n  yu-psd-spike run <candidate-id> <corpus.json>"
+    "usage:\n  yu-psd-spike validate <corpus.json>\n  yu-psd-spike candidates\n  yu-psd-spike comparison <comparison.json>\n  yu-psd-spike run <candidate-id> <corpus.json>\n  yu-psd-spike benchmark <corpus.json> <benchmark-plan.json> [report.json]"
 }
