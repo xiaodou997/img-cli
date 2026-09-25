@@ -1,6 +1,6 @@
 use crate::{
-    EngineManager, EngineTarget, InstalledEngineMetadata, LIFECYCLE_SCHEMA_VERSION, ManagerError,
-    INSTALL_METADATA_FILE, validate_identifier, validate_relative_entrypoint,
+    EngineManager, EngineTarget, INSTALL_METADATA_FILE, InstalledEngineMetadata,
+    LIFECYCLE_SCHEMA_VERSION, ManagerError, validate_identifier, validate_relative_entrypoint,
     validate_version_segment,
 };
 use serde::{Deserialize, Serialize};
@@ -230,7 +230,8 @@ impl EngineManager {
                                             continue;
                                         }
                                     };
-                                    versions.push(self.inspect_managed_version(id, &version, &path));
+                                    versions
+                                        .push(self.inspect_managed_version(id, &version, &path));
                                 }
                                 Ok(_) => {}
                                 Err(error) => warnings.push(format!(
@@ -478,7 +479,10 @@ impl EngineManager {
     }
 }
 
-fn read_active_state(manager: &EngineManager, engine_id: &str) -> Result<Option<String>, ManagerError> {
+fn read_active_state(
+    manager: &EngineManager,
+    engine_id: &str,
+) -> Result<Option<String>, ManagerError> {
     let path = manager
         .layout()
         .state_dir()
@@ -489,9 +493,8 @@ fn read_active_state(manager: &EngineManager, engine_id: &str) -> Result<Option<
         return Ok(None);
     }
 
-    let metadata = fs::symlink_metadata(&path).map_err(|error| {
-        ManagerError::Io(format!("cannot inspect {}: {error}", path.display()))
-    })?;
+    let metadata = fs::symlink_metadata(&path)
+        .map_err(|error| ManagerError::Io(format!("cannot inspect {}: {error}", path.display())))?;
     if metadata.file_type().is_symlink() || !metadata.is_file() {
         return Err(ManagerError::State(format!(
             "engine active-state file must be a real file: {}",
@@ -502,7 +505,10 @@ fn read_active_state(manager: &EngineManager, engine_id: &str) -> Result<Option<
     let bytes = fs::read(&path)
         .map_err(|error| ManagerError::Io(format!("cannot read {}: {error}", path.display())))?;
     let state: ActiveStateFile = serde_json::from_slice(&bytes).map_err(|error| {
-        ManagerError::State(format!("cannot parse active state {}: {error}", path.display()))
+        ManagerError::State(format!(
+            "cannot parse active state {}: {error}",
+            path.display()
+        ))
     })?;
 
     if state.schema_version != LIFECYCLE_SCHEMA_VERSION {
@@ -719,10 +725,10 @@ fn provider_priority(provider: EngineProvider) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::lifecycle::write_install_metadata;
     use crate::{
         ArchiveKind, EngineManifest, EnginePackage, MANIFEST_SCHEMA_VERSION, ManagedLayout,
     };
-    use crate::lifecycle::write_install_metadata;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn temp_root(label: &str) -> PathBuf {
@@ -842,11 +848,8 @@ mod tests {
             Some("7.1.2-3")
         );
         assert_eq!(
-            parse_version_output(
-                VersionParser::Ffmpeg,
-                "ffmpeg version 8.0 Copyright (c)"
-            )
-            .as_deref(),
+            parse_version_output(VersionParser::Ffmpeg, "ffmpeg version 8.0 Copyright (c)")
+                .as_deref(),
             Some("8.0")
         );
         assert_eq!(
@@ -865,7 +868,8 @@ mod tests {
             version: Some("0.1.0".to_owned()),
             capabilities: vec!["image.info".to_owned()],
         };
-        let json = serde_json::to_value(EngineInventoryEntry::from_descriptor(&descriptor)).unwrap();
+        let json =
+            serde_json::to_value(EngineInventoryEntry::from_descriptor(&descriptor)).unwrap();
 
         assert_eq!(json["id"], "raster-rs");
         assert_eq!(json["provider"], "built_in");

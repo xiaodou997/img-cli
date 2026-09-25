@@ -339,9 +339,10 @@ fn inventory_warnings(inventory: &[EngineInventoryEntry]) -> Vec<String> {
     inventory
         .iter()
         .flat_map(|engine| {
-            engine.warnings.iter().map(|warning| {
-                format!("{} [{}]: {warning}", engine.id, engine.provider)
-            })
+            engine
+                .warnings
+                .iter()
+                .map(|warning| format!("{} [{}]: {warning}", engine.id, engine.provider))
         })
         .collect()
 }

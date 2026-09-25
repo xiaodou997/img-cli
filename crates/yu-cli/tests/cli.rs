@@ -123,13 +123,9 @@ fn engine_info_json_reports_built_in_provider() {
         .expect("engine.info result should be an array");
 
     assert_eq!(json["operation"], "engine.info");
-    assert!(
-        entries
-            .iter()
-            .any(|engine| engine["id"] == "raster-rs"
-                && engine["provider"] == "built_in"
-                && engine["state"] == "ready")
-    );
+    assert!(entries.iter().any(|engine| engine["id"] == "raster-rs"
+        && engine["provider"] == "built_in"
+        && engine["state"] == "ready"));
 }
 
 #[test]
@@ -299,9 +295,7 @@ fn engine_versions_activate_deactivate_remove_round_trip() {
         .as_array()
         .unwrap()
         .iter()
-        .find(|engine| {
-            engine["id"] == "fixture-engine" && engine["provider"] == "managed"
-        })
+        .find(|engine| engine["id"] == "fixture-engine" && engine["provider"] == "managed")
         .expect("managed fixture should be discovered");
     assert_eq!(managed["state"], "disabled");
     assert_eq!(managed["installed_versions"].as_array().unwrap().len(), 2);
