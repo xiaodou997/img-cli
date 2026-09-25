@@ -1720,6 +1720,10 @@ mod tests {
             .join("../../docs/data/psd-candidate-comparison-v1.json")
     }
 
+    fn committed_benchmark_path() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/psd/benchmark-v1.json")
+    }
+
     struct ExpectedObservationAdapter;
 
     impl PsdCandidateAdapter for ExpectedObservationAdapter {
@@ -1784,6 +1788,21 @@ mod tests {
                 candidate.id
             );
         }
+    }
+
+    #[test]
+    fn committed_benchmark_config_is_valid() {
+        let corpus = load_corpus(&committed_corpus_path()).expect("committed corpus should load");
+        let config = load_benchmark_config(&committed_benchmark_path())
+            .expect("committed benchmark config should parse");
+        validate_benchmark_config(&config, &corpus)
+            .expect("committed benchmark config should be valid");
+
+        assert_eq!(config.schema_version, BENCHMARK_SCHEMA_VERSION);
+        assert_eq!(config.fixture_id, "simple-pixel-layers-psd");
+        assert_eq!(config.layer_name, "Слой");
+        assert_eq!(config.warmup_iterations, 2);
+        assert_eq!(config.sample_iterations, 5);
     }
 
     #[test]
@@ -1890,6 +1909,39 @@ mod tests {
     }
 
     #[test]
+    fn rawpsd_layer_export_and_benchmark_smoke() {
+        let adapter = RawPsdCandidateAdapter;
+        let export = run_layer_export(
+            &committed_corpus_path(),
+            "simple-pixel-layers-psd",
+            "Слой",
+            &adapter,
+        )
+        .expect("rawpsd layer export should run");
+        let benchmark = run_benchmark(
+            &committed_corpus_path(),
+            &committed_benchmark_path(),
+            &adapter,
+        )
+        .expect("rawpsd benchmark should run");
+
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&export).expect("export report should serialize")
+        );
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&benchmark).expect("benchmark report should serialize")
+        );
+
+        assert_eq!(export.schema_version, LAYER_EXPORT_SCHEMA_VERSION);
+        assert_eq!(benchmark.schema_version, BENCHMARK_SCHEMA_VERSION);
+        assert_eq!(benchmark.observation.inspect_samples_us.len(), 5);
+        assert_eq!(benchmark.observation.layer_export_samples_us.len(), 5);
+        assert_eq!(export.observation, benchmark.observation.layer_export);
+    }
+
+    #[test]
     fn psd_tools_candidate_is_wired_but_optional() {
         let adapter = candidate_adapters()
             .into_iter()
@@ -1938,6 +1990,38 @@ mod tests {
         assert_eq!(report.summary.failed, 0);
         assert_eq!(report.summary.skipped, 0);
         assert_eq!(report.summary.errors, 0);
+    }
+
+    #[test]
+    #[ignore = "requires Python 3.12 with psd-tools 1.20.0"]
+    fn psd_tools_layer_export_and_benchmark_smoke() {
+        let adapter = PsdToolsReferenceAdapter::default();
+        let export = run_layer_export(
+            &committed_corpus_path(),
+            "simple-pixel-layers-psd",
+            "Слой",
+            &adapter,
+        )
+        .expect("psd-tools layer export should run");
+        let benchmark = run_benchmark(
+            &committed_corpus_path(),
+            &committed_benchmark_path(),
+            &adapter,
+        )
+        .expect("psd-tools benchmark should run");
+
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&export).expect("export report should serialize")
+        );
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&benchmark).expect("benchmark report should serialize")
+        );
+
+        assert_eq!(benchmark.observation.inspect_samples_us.len(), 5);
+        assert_eq!(benchmark.observation.layer_export_samples_us.len(), 5);
+        assert_eq!(export.observation, benchmark.observation.layer_export);
     }
 
     #[test]
@@ -1990,6 +2074,38 @@ mod tests {
         assert_eq!(report.summary.failed, 0);
         assert_eq!(report.summary.skipped, 0);
         assert_eq!(report.summary.errors, 0);
+    }
+
+    #[test]
+    #[ignore = "requires Node.js 22 with ag-psd 31.0.2"]
+    fn ag_psd_layer_export_and_benchmark_smoke() {
+        let adapter = AgPsdCandidateAdapter::default();
+        let export = run_layer_export(
+            &committed_corpus_path(),
+            "simple-pixel-layers-psd",
+            "Слой",
+            &adapter,
+        )
+        .expect("ag-psd layer export should run");
+        let benchmark = run_benchmark(
+            &committed_corpus_path(),
+            &committed_benchmark_path(),
+            &adapter,
+        )
+        .expect("ag-psd benchmark should run");
+
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&export).expect("export report should serialize")
+        );
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&benchmark).expect("benchmark report should serialize")
+        );
+
+        assert_eq!(benchmark.observation.inspect_samples_us.len(), 5);
+        assert_eq!(benchmark.observation.layer_export_samples_us.len(), 5);
+        assert_eq!(export.observation, benchmark.observation.layer_export);
     }
 
     #[test]
