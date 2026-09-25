@@ -1,6 +1,6 @@
 use crate::{
-    lifecycle::write_install_metadata, ArchiveKind, EngineManager, EngineManifest, EnginePackage,
-    ManagerError,
+    ArchiveKind, EngineManager, EngineManifest, EnginePackage, ManagerError,
+    lifecycle::write_install_metadata,
 };
 use flate2::read::GzDecoder;
 use reqwest::blocking::Client;

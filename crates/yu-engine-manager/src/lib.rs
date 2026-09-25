@@ -6,8 +6,8 @@ pub use installer::{
     Downloader, EngineInstaller, HttpDownloader, InstallLimits, InstallReceipt, sha256_file,
 };
 pub use lifecycle::{
-    ActivationReceipt, DeactivationReceipt, InstalledEngineMetadata, InstalledVersion,
-    RemovalReceipt, INSTALL_METADATA_FILE, LIFECYCLE_SCHEMA_VERSION,
+    ActivationReceipt, DeactivationReceipt, INSTALL_METADATA_FILE, InstalledEngineMetadata,
+    InstalledVersion, LIFECYCLE_SCHEMA_VERSION, RemovalReceipt,
 };
 
 use serde::{Deserialize, Serialize};
@@ -319,7 +319,9 @@ impl fmt::Display for ManagerError {
             Self::AlreadyInstalled(message) => write!(f, "engine is already installed: {message}"),
             Self::NotInstalled(message) => write!(f, "engine is not installed: {message}"),
             Self::Ownership(message) => write!(f, "engine ownership violation: {message}"),
-            Self::ActiveVersion(message) => write!(f, "active engine version cannot be removed: {message}"),
+            Self::ActiveVersion(message) => {
+                write!(f, "active engine version cannot be removed: {message}")
+            }
             Self::State(message) => write!(f, "engine lifecycle state is invalid: {message}"),
             Self::Download(message) => write!(f, "engine download failed: {message}"),
             Self::Integrity(message) => write!(f, "engine integrity check failed: {message}"),

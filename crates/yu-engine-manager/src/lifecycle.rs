@@ -1,6 +1,6 @@
 use crate::{
-    EngineManager, EngineManifest, EnginePackage, EngineTarget, ManagerError,
-    validate_identifier, validate_relative_entrypoint, validate_version_segment,
+    EngineManager, EngineManifest, EnginePackage, EngineTarget, ManagerError, validate_identifier,
+    validate_relative_entrypoint, validate_version_segment,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -217,9 +217,7 @@ impl EngineManager {
                 .expect("lifecycle trash path always has a parent"),
         )
         .map_err(|error| {
-            ManagerError::Io(format!(
-                "cannot create lifecycle trash directory: {error}"
-            ))
+            ManagerError::Io(format!("cannot create lifecycle trash directory: {error}"))
         })?;
 
         fs::rename(&state_path, &trash).map_err(|error| {
@@ -272,9 +270,7 @@ impl EngineManager {
                 .expect("lifecycle trash path always has a parent"),
         )
         .map_err(|error| {
-            ManagerError::Io(format!(
-                "cannot create lifecycle trash directory: {error}"
-            ))
+            ManagerError::Io(format!("cannot create lifecycle trash directory: {error}"))
         })?;
 
         fs::rename(&version_dir, &trash).map_err(|error| {
@@ -505,8 +501,7 @@ fn validate_metadata(
     validate_version_segment(&metadata.version)?;
     validate_relative_entrypoint(&metadata.entrypoint)?;
 
-    if metadata.sha256.len() != 64
-        || !metadata.sha256.bytes().all(|byte| byte.is_ascii_hexdigit())
+    if metadata.sha256.len() != 64 || !metadata.sha256.bytes().all(|byte| byte.is_ascii_hexdigit())
     {
         return Err(ManagerError::State(
             "installation metadata contains an invalid SHA-256 digest".to_owned(),
@@ -555,11 +550,11 @@ fn active_state_path(manager: &EngineManager, engine_id: &str) -> PathBuf {
 }
 
 fn unique_trash_path(manager: &EngineManager, label: &str) -> PathBuf {
-    manager
-        .layout()
-        .cache_dir()
-        .join("trash")
-        .join(format!("{label}-{}-{}", std::process::id(), nonce()))
+    manager.layout().cache_dir().join("trash").join(format!(
+        "{label}-{}-{}",
+        std::process::id(),
+        nonce()
+    ))
 }
 
 fn nonce() -> u128 {
@@ -626,7 +621,11 @@ fn atomic_replace_file(source: &Path, destination: &Path) -> Result<(), ManagerE
     };
 
     let source_wide: Vec<u16> = source.as_os_str().encode_wide().chain(Some(0)).collect();
-    let destination_wide: Vec<u16> = destination.as_os_str().encode_wide().chain(Some(0)).collect();
+    let destination_wide: Vec<u16> = destination
+        .as_os_str()
+        .encode_wide()
+        .chain(Some(0))
+        .collect();
 
     let result = unsafe {
         MoveFileExW(
@@ -773,8 +772,20 @@ mod tests {
         );
 
         let versions = manager.list_managed_versions(&descriptor).unwrap();
-        assert!(!versions.iter().find(|item| item.version == "1.0.0").unwrap().active);
-        assert!(versions.iter().find(|item| item.version == "2.0.0").unwrap().active);
+        assert!(
+            !versions
+                .iter()
+                .find(|item| item.version == "1.0.0")
+                .unwrap()
+                .active
+        );
+        assert!(
+            versions
+                .iter()
+                .find(|item| item.version == "2.0.0")
+                .unwrap()
+                .active
+        );
 
         let _ = fs::remove_dir_all(root);
     }
