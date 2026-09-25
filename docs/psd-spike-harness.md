@@ -117,6 +117,29 @@ Known API/capability gaps are intentionally represented as missing observations 
 
 These gaps are expected to appear as fixture failures in the comparison report. They are not converted into harness errors.
 
+The first corpus-v1 run establishes this rawpsd baseline:
+
+| Fixture | rawpsd 0.2.2 |
+| --- | --- |
+| `simple-pixel-layers-psd` | pass |
+| `simple-pixel-layers-psb` | fail — PSB rejected |
+| `nested-group` | pass |
+| `duplicate-layer-names` | pass |
+| `text-layer` | fail — normalized text-layer count unavailable |
+| `layer-masks` | fail — fixture rejected by parser |
+| `malformed-truncated-header` | pass — correctly rejected |
+
+Summary:
+
+```text
+passed:  4
+failed:  3
+skipped: 0
+errors:  0
+```
+
+This baseline is intentionally asserted by the spike tests so future rawpsd upgrades cannot silently change the comparison result.
+
 ### psd-tools reference runtime
 
 The reference environment is intentionally pinned:
