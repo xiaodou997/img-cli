@@ -16,6 +16,7 @@ pub const PSD_TOOLS_REFERENCE_PYTHON: &str = "3.12";
 pub const RAWPSD_CANDIDATE_VERSION: &str = "0.2.2";
 pub const AG_PSD_CANDIDATE_VERSION: &str = "31.0.2";
 pub const AG_PSD_CANDIDATE_NODE_MAJOR: &str = "22";
+pub const COMPARISON_SCHEMA_VERSION: &str = "1";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PsdCorpus {
@@ -217,6 +218,248 @@ pub fn validate_corpus(corpus: &PsdCorpus, root: &Path) -> Result<(), CorpusErro
                 resolved.display()
             )));
         }
+    }
+
+    Ok(())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CandidateComparisonSnapshot {
+    pub schema_version: String,
+    pub observation_date: String,
+    pub corpus: ComparisonCorpus,
+    pub decision_state: String,
+    pub benchmark: ComparisonBenchmark,
+    pub candidates: Vec<ComparisonCandidate>,
+    pub decision_gaps: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ComparisonCorpus {
+    pub path: String,
+    pub schema_version: String,
+    pub fixture_count: usize,
+    pub covered_features: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ComparisonBenchmark {
+    pub status: String,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ComparisonCandidate {
+    pub id: String,
+    pub engine: String,
+    pub version: String,
+    pub runtime: String,
+    pub runtime_pin: String,
+    pub license: String,
+    pub repository: String,
+    pub latest_observed_commit: String,
+    pub latest_observed_commit_date: String,
+    pub distribution: ComparisonDistribution,
+    pub corpus_result: ComparisonCorpusResult,
+    pub verified: serde_json::Value,
+    pub upstream_api_evidence: serde_json::Value,
+    #[serde(default)]
+    pub notes: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ComparisonDistribution {
+    pub model: String,
+    pub core_dependency: bool,
+    pub direct_dependencies: Vec<String>,
+    pub optional_render_dependencies: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ComparisonCorpusResult {
+    pub passed: usize,
+    pub failed: usize,
+    pub skipped: usize,
+    pub errors: usize,
+    pub failed_fixtures: Vec<String>,
+}
+
+pub fn load_candidate_comparison(path: &Path) -> Result<CandidateComparisonSnapshot, CorpusError> {
+    let content = fs::read_to_string(path).map_err(|error| {
+        CorpusError::new(format!(
+            "failed to read PSD candidate comparison {}: {error}",
+            path.display()
+        ))
+    })?;
+    let comparison =
+        serde_json::from_str::<CandidateComparisonSnapshot>(&content).map_err(|error| {
+            CorpusError::new(format!(
+                "failed to parse PSD candidate comparison {}: {error}",
+                path.display()
+            ))
+        })?;
+    validate_candidate_comparison(&comparison)?;
+    Ok(comparison)
+}
+
+pub fn validate_candidate_comparison(
+    comparison: &CandidateComparisonSnapshot,
+) -> Result<(), CorpusError> {
+    if comparison.schema_version != COMPARISON_SCHEMA_VERSION {
+        return Err(CorpusError::new(format!(
+            "unsupported PSD comparison schema {}; expected {}",
+            comparison.schema_version, COMPARISON_SCHEMA_VERSION
+        )));
+    }
+    if comparison.corpus.schema_version != CORPUS_SCHEMA_VERSION {
+        return Err(CorpusError::new(format!(
+            "comparison corpus schema {} does not match harness schema {}",
+            comparison.corpus.schema_version, CORPUS_SCHEMA_VERSION
+        )));
+    }
+    if comparison.corpus.fixture_count == 0 {
+        return Err(CorpusError::new(
+            "PSD candidate comparison must reference at least one fixture",
+        ));
+    }
+    if comparison.decision_state != "evidence_only" {
+        return Err(CorpusError::new(
+            "PR #15 comparison must remain evidence_only",
+        ));
+    }
+    if comparison.benchmark.status != "not_measured" {
+        return Err(CorpusError::new(
+            "PR #15 must not claim a measured benchmark",
+        ));
+    }
+    if comparison.candidates.len() != 3 {
+        return Err(CorpusError::new(format!(
+            "PSD candidate comparison must contain exactly three candidates; found {}",
+            comparison.candidates.len()
+        )));
+    }
+
+    let mut ids = HashSet::new();
+    for candidate in &comparison.candidates {
+        if !ids.insert(candidate.id.as_str()) {
+            return Err(CorpusError::new(format!(
+                "duplicate PSD comparison candidate ID: {}",
+                candidate.id
+            )));
+        }
+        if candidate.distribution.core_dependency {
+            return Err(CorpusError::new(format!(
+                "PSD spike candidate {} must not be marked as a YuTool core dependency",
+                candidate.id
+            )));
+        }
+
+        let total = candidate.corpus_result.passed
+            + candidate.corpus_result.failed
+            + candidate.corpus_result.skipped
+            + candidate.corpus_result.errors;
+        if total != comparison.corpus.fixture_count {
+            return Err(CorpusError::new(format!(
+                "PSD comparison candidate {} result total {} does not match fixture count {}",
+                candidate.id, total, comparison.corpus.fixture_count
+            )));
+        }
+        if candidate.corpus_result.failed_fixtures.len() != candidate.corpus_result.failed {
+            return Err(CorpusError::new(format!(
+                "PSD comparison candidate {} failed fixture list does not match failed count",
+                candidate.id
+            )));
+        }
+    }
+
+    let expected_ids = ["psd-tools", "rust-native", "typescript-psd"];
+    if expected_ids.iter().any(|id| !ids.contains(id)) {
+        return Err(CorpusError::new(
+            "PSD candidate comparison is missing an M3 candidate",
+        ));
+    }
+
+    validate_comparison_baseline(
+        comparison,
+        "psd-tools",
+        PSD_TOOLS_REFERENCE_VERSION,
+        7,
+        0,
+        &[],
+    )?;
+    validate_comparison_baseline(
+        comparison,
+        "rust-native",
+        RAWPSD_CANDIDATE_VERSION,
+        4,
+        3,
+        &[
+            "layer-masks",
+            "simple-pixel-layers-psb",
+            "text-layer",
+        ],
+    )?;
+    validate_comparison_baseline(
+        comparison,
+        "typescript-psd",
+        AG_PSD_CANDIDATE_VERSION,
+        7,
+        0,
+        &[],
+    )?;
+
+    if comparison.decision_gaps.is_empty() {
+        return Err(CorpusError::new(
+            "PSD candidate comparison must record remaining decision gaps",
+        ));
+    }
+
+    Ok(())
+}
+
+fn validate_comparison_baseline(
+    comparison: &CandidateComparisonSnapshot,
+    id: &str,
+    version: &str,
+    passed: usize,
+    failed: usize,
+    expected_failed_fixtures: &[&str],
+) -> Result<(), CorpusError> {
+    let candidate = comparison
+        .candidates
+        .iter()
+        .find(|candidate| candidate.id == id)
+        .ok_or_else(|| CorpusError::new(format!("missing PSD comparison candidate: {id}")))?;
+
+    if candidate.version != version {
+        return Err(CorpusError::new(format!(
+            "PSD comparison candidate {id} version {} does not match pinned version {version}",
+            candidate.version
+        )));
+    }
+    if candidate.corpus_result.passed != passed || candidate.corpus_result.failed != failed {
+        return Err(CorpusError::new(format!(
+            "PSD comparison candidate {id} baseline changed: expected {passed} passed / {failed} failed"
+        )));
+    }
+    if candidate.corpus_result.skipped != 0 || candidate.corpus_result.errors != 0 {
+        return Err(CorpusError::new(format!(
+            "PSD comparison candidate {id} must have zero skipped/errors in corpus v1 baseline"
+        )));
+    }
+
+    let mut actual_failed = candidate.corpus_result.failed_fixtures.clone();
+    actual_failed.sort();
+    let mut expected_failed = expected_failed_fixtures
+        .iter()
+        .map(|value| (*value).to_owned())
+        .collect::<Vec<_>>();
+    expected_failed.sort();
+
+    if actual_failed != expected_failed {
+        return Err(CorpusError::new(format!(
+            "PSD comparison candidate {id} failed fixture baseline changed"
+        )));
     }
 
     Ok(())
@@ -827,6 +1070,11 @@ mod tests {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/psd/corpus.json")
     }
 
+    fn committed_comparison_path() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../docs/data/psd-candidate-comparison-v1.json")
+    }
+
     struct ExpectedObservationAdapter;
 
     impl PsdCandidateAdapter for ExpectedObservationAdapter {
@@ -856,6 +1104,40 @@ mod tests {
                 pixel_mask_layer_count: fixture.expected.pixel_mask_layer_count,
                 vector_mask_layer_count: fixture.expected.vector_mask_layer_count,
             })
+        }
+    }
+
+    #[test]
+    fn committed_comparison_is_valid_and_frozen() {
+        let comparison = load_candidate_comparison(&committed_comparison_path())
+            .expect("committed PSD candidate comparison should be valid");
+
+        assert_eq!(comparison.schema_version, COMPARISON_SCHEMA_VERSION);
+        assert_eq!(comparison.corpus.fixture_count, 7);
+        assert_eq!(comparison.decision_state, "evidence_only");
+        assert_eq!(comparison.benchmark.status, "not_measured");
+        assert_eq!(comparison.candidates.len(), 3);
+    }
+
+    #[test]
+    fn comparison_snapshot_versions_match_registered_candidates() {
+        let comparison = load_candidate_comparison(&committed_comparison_path())
+            .expect("committed PSD candidate comparison should be valid");
+        let descriptors = candidate_adapters()
+            .into_iter()
+            .map(|adapter| adapter.descriptor())
+            .collect::<Vec<_>>();
+
+        for candidate in &comparison.candidates {
+            let descriptor = descriptors
+                .iter()
+                .find(|descriptor| descriptor.id == candidate.id)
+                .expect("comparison candidate should be registered");
+            assert!(
+                descriptor.display_name.contains(&candidate.version),
+                "descriptor version drift for {}",
+                candidate.id
+            );
         }
     }
 
