@@ -21,6 +21,6 @@ License: MIT. The complete upstream license notice is included at `licenses/psd-
 | `upstream/psd-tools/group.psd` | `tests/psd_files/group.psd` | copied unchanged |
 | `upstream/psd-tools/type-layer.psd` | `tests/psd_files/layers-minimal/type-layer.psd` | copied unchanged |
 | `upstream/psd-tools/masks-2.psd` | `tests/psd_files/masks/2.psd` | copied unchanged |
-| `derived/duplicate-layer-names.psd` | `tests/psd_files/2layers.psd` | derived by YuTool; layer names changed to `X` |
+| `derived/duplicate-layer-names.psd` | `tests/psd_files/2layers.psd` | derived by YuTool; Unicode `luni` names changed to `X`, Pascal names preserved |
 
 The copied and derived fixtures remain subject to the upstream MIT license notice.
