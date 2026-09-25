@@ -4,7 +4,7 @@ use std::env;
 use std::ffi::OsString;
 use std::fmt;
 use std::fs;
-use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 use std::time::Instant;
