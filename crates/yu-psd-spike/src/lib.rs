@@ -916,11 +916,25 @@ mod tests {
             "{}",
             serde_json::to_string_pretty(&report).expect("report should serialize")
         );
+        assert_eq!(report.summary.passed, 4);
+        assert_eq!(report.summary.failed, 3);
         assert_eq!(report.summary.skipped, 0);
         assert_eq!(report.summary.errors, 0);
+
+        let mut failed = report
+            .fixtures
+            .iter()
+            .filter(|fixture| fixture.status == FixtureStatus::Failed)
+            .map(|fixture| fixture.fixture_id.as_str())
+            .collect::<Vec<_>>();
+        failed.sort_unstable();
         assert_eq!(
-            report.summary.passed + report.summary.failed,
-            report.fixtures.len()
+            failed,
+            vec![
+                "layer-masks",
+                "simple-pixel-layers-psb",
+                "text-layer",
+            ]
         );
     }
 
