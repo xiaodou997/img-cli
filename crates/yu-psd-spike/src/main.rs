@@ -1,7 +1,9 @@
 use std::env;
 use std::path::Path;
 use std::process;
-use yu_psd_spike::{candidate_adapters, load_corpus, run_candidate};
+use yu_psd_spike::{
+    candidate_adapters, load_candidate_comparison, load_corpus, run_candidate,
+};
 
 fn main() {
     if let Err(message) = run() {
@@ -35,6 +37,14 @@ fn run() -> Result<(), String> {
             println!("{json}");
             Ok(())
         }
+        [command, comparison] if command == "comparison" => {
+            let snapshot =
+                load_candidate_comparison(Path::new(comparison)).map_err(|error| error.to_string())?;
+            let json = serde_json::to_string_pretty(&snapshot)
+                .map_err(|error| format!("failed to serialize comparison: {error}"))?;
+            println!("{json}");
+            Ok(())
+        }
         [command, candidate_id, corpus] if command == "run" => {
             let adapter = candidate_adapters()
                 .into_iter()
@@ -52,5 +62,5 @@ fn run() -> Result<(), String> {
 }
 
 fn usage() -> &'static str {
-    "usage:\n  yu-psd-spike validate <corpus.json>\n  yu-psd-spike candidates\n  yu-psd-spike run <candidate-id> <corpus.json>"
+    "usage:\n  yu-psd-spike validate <corpus.json>\n  yu-psd-spike candidates\n  yu-psd-spike comparison <comparison.json>\n  yu-psd-spike run <candidate-id> <corpus.json>"
 }
