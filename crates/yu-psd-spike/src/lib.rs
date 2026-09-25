@@ -4,6 +4,7 @@ use std::env;
 use std::ffi::OsString;
 use std::fmt;
 use std::fs;
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 use std::time::Instant;
@@ -12,6 +13,7 @@ pub const CORPUS_SCHEMA_VERSION: &str = "1";
 pub const REPORT_SCHEMA_VERSION: &str = "1";
 pub const PSD_TOOLS_REFERENCE_VERSION: &str = "1.20.0";
 pub const PSD_TOOLS_REFERENCE_PYTHON: &str = "3.12";
+pub const RAWPSD_CANDIDATE_VERSION: &str = "0.2.2";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PsdCorpus {
@@ -342,6 +344,100 @@ impl PsdCandidateAdapter for SkeletonAdapter {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+struct RawPsdCandidateAdapter;
+
+impl RawPsdCandidateAdapter {
+    fn parse(input: &Path) -> Result<AdapterObservation, AdapterError> {
+        let bytes = fs::read(input).map_err(|error| {
+            AdapterError::execution(format!(
+                "failed to read rawpsd candidate input {}: {error}",
+                input.display()
+            ))
+        })?;
+
+        let parsed = catch_unwind(AssertUnwindSafe(|| {
+            let metadata = rawpsd::parse_psd_metadata(&bytes)?;
+            let layers = rawpsd::parse_layer_records(&bytes).map_err(|(_, error)| error)?;
+            Ok::<_, String>((metadata, layers))
+        }));
+
+        let (metadata, layers) = match parsed {
+            Ok(Ok(parsed)) => parsed,
+            Ok(Err(_)) | Err(_) => {
+                return Ok(AdapterObservation {
+                    parse_success: false,
+                    ..AdapterObservation::default()
+                });
+            }
+        };
+
+        let mut logical_layer_count = 0usize;
+        let mut maximum_tree_depth = 0usize;
+        let mut current_depth = 1usize;
+        let mut layer_names = Vec::new();
+        let mut pixel_mask_layer_count = 0usize;
+
+        for layer in &layers {
+            if layer.group_closer {
+                current_depth = current_depth.saturating_add(1);
+                continue;
+            }
+
+            if layer.group_opener {
+                let group_depth = current_depth.saturating_sub(1).max(1);
+                logical_layer_count += 1;
+                maximum_tree_depth = maximum_tree_depth.max(group_depth);
+                layer_names.push(layer.name.clone());
+                if layer.mask_channel_count > 0 {
+                    pixel_mask_layer_count += 1;
+                }
+                current_depth = group_depth;
+                continue;
+            }
+
+            logical_layer_count += 1;
+            maximum_tree_depth = maximum_tree_depth.max(current_depth);
+            layer_names.push(layer.name.clone());
+            if layer.mask_channel_count > 0 {
+                pixel_mask_layer_count += 1;
+            }
+        }
+
+        Ok(AdapterObservation {
+            parse_success: true,
+            width: Some(metadata.width),
+            height: Some(metadata.height),
+            layer_count: Some(logical_layer_count),
+            maximum_tree_depth: Some(maximum_tree_depth),
+            layer_names: Some(layer_names),
+            text_layer_count: None,
+            pixel_mask_layer_count: Some(pixel_mask_layer_count),
+            vector_mask_layer_count: None,
+        })
+    }
+}
+
+impl PsdCandidateAdapter for RawPsdCandidateAdapter {
+    fn descriptor(&self) -> CandidateDescriptor {
+        CandidateDescriptor {
+            id: "rust-native".to_owned(),
+            display_name: format!("rawpsd {RAWPSD_CANDIDATE_VERSION} candidate"),
+            runtime: CandidateRuntime::RustNative,
+            status: CandidateStatus::Wired,
+            notes: "Rust-native metadata candidate. rawpsd 0.2.2 supports PSD but not PSB and does not currently expose normalized text-layer or vector-mask semantics.".to_owned(),
+        }
+    }
+
+    fn inspect(
+        &self,
+        input: &Path,
+        _fixture: &PsdFixture,
+    ) -> Result<AdapterObservation, AdapterError> {
+        Self::parse(input)
+    }
+}
+
 #[derive(Debug, Clone)]
 struct PsdToolsReferenceAdapter {
     python: OsString,
@@ -424,12 +520,7 @@ impl PsdCandidateAdapter for PsdToolsReferenceAdapter {
 
 pub fn candidate_adapters() -> Vec<Box<dyn PsdCandidateAdapter>> {
     vec![
-        Box::new(SkeletonAdapter::new(
-            "rust-native",
-            "Rust-native PSD candidate",
-            CandidateRuntime::RustNative,
-            "Reserved for Rust PSD implementations evaluated during M3.",
-        )),
+        Box::new(RawPsdCandidateAdapter),
         Box::new(PsdToolsReferenceAdapter::default()),
         Box::new(SkeletonAdapter::new(
             "typescript-psd",
@@ -791,7 +882,7 @@ mod tests {
             .filter(|adapter| adapter.descriptor().status == CandidateStatus::Skeleton)
             .collect::<Vec<_>>();
 
-        assert_eq!(skeletons.len(), 2);
+        assert_eq!(skeletons.len(), 1);
         for adapter in skeletons {
             let report = run_candidate(&committed_corpus_path(), adapter.as_ref())
                 .expect("skeleton adapter should produce a report");
@@ -799,6 +890,48 @@ mod tests {
             assert_eq!(report.summary.failed, 0);
             assert_eq!(report.summary.errors, 0);
         }
+    }
+
+    #[test]
+    fn rawpsd_candidate_is_wired() {
+        let adapter = candidate_adapters()
+            .into_iter()
+            .find(|adapter| adapter.descriptor().id == "rust-native")
+            .expect("rust-native candidate must be registered");
+        let descriptor = adapter.descriptor();
+
+        assert_eq!(descriptor.status, CandidateStatus::Wired);
+        assert_eq!(descriptor.runtime, CandidateRuntime::RustNative);
+        assert!(descriptor.display_name.contains("rawpsd"));
+        assert!(descriptor.notes.contains(RAWPSD_CANDIDATE_VERSION));
+    }
+
+    #[test]
+    fn rawpsd_candidate_runs_committed_corpus_without_harness_errors() {
+        let adapter = RawPsdCandidateAdapter;
+        let report = run_candidate(&committed_corpus_path(), &adapter)
+            .expect("rawpsd candidate should produce a report");
+
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&report).expect("report should serialize")
+        );
+        assert_eq!(report.summary.passed, 4);
+        assert_eq!(report.summary.failed, 3);
+        assert_eq!(report.summary.skipped, 0);
+        assert_eq!(report.summary.errors, 0);
+
+        let mut failed = report
+            .fixtures
+            .iter()
+            .filter(|fixture| fixture.status == FixtureStatus::Failed)
+            .map(|fixture| fixture.fixture_id.as_str())
+            .collect::<Vec<_>>();
+        failed.sort_unstable();
+        assert_eq!(
+            failed,
+            vec!["layer-masks", "simple-pixel-layers-psb", "text-layer",]
+        );
     }
 
     #[test]

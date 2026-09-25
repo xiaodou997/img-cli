@@ -132,7 +132,7 @@ Progress:
 - [x] Rust / psd-tools / TypeScript candidate adapter skeletons;
 - [x] machine-readable per-candidate report model;
 - [ ] representative redistributable PSD/PSB fixture corpus;
-- [ ] Rust-native candidate integration(s);
+- [x] first Rust-native candidate integration (rawpsd 0.2.2);
 - [x] psd-tools 1.20.0 reference candidate integration (Python 3.12);
 - [ ] TypeScript/Node candidate integration where useful;
 - [ ] benchmark/conformance comparison report;

@@ -80,15 +80,65 @@ The contract can be extended as the corpus starts testing masks, text, Smart Obj
 
 ## Candidate status
 
-PR #10 registered three candidate slots. PR #12 wires only the psd-tools reference candidate:
+PR #10 registered three candidate slots. PR #12 wired the psd-tools reference; PR #13 wires the first Rust-native candidate:
 
 | Candidate ID | Runtime family | Current behavior |
 | --- | --- | --- |
-| `rust-native` | Rust | skeleton / unavailable |
+| `rust-native` | Rust | rawpsd 0.2.2 candidate |
 | `psd-tools` | Python | wired reference adapter |
 | `typescript-psd` | TypeScript/Node | skeleton / unavailable |
 
-A skeleton returns an explicit `unavailable` result. Wiring psd-tools as the first reference candidate does not select it as YuTool's default PSD engine.
+A skeleton returns an explicit `unavailable` result. A wired candidate is evidence for comparison, not a default-engine selection.
+
+### rawpsd Rust-native candidate
+
+PR #13 pins:
+
+```text
+rawpsd 0.2.2
+```
+
+The dependency is scoped to the development-only `yu-psd-spike` crate. It is not added to YuTool's production runtime.
+
+Normalization currently uses rawpsd's PSD metadata and raw layer records to report:
+
+- parse success/rejection;
+- width and height;
+- logical layer count;
+- group-derived maximum tree depth;
+- Unicode-aware layer names exposed by rawpsd;
+- pixel-mask presence derived from mask channels.
+
+Known API/capability gaps are intentionally represented as missing observations rather than guessed values:
+
+- PSB is not supported by rawpsd 0.2.2;
+- normalized text-layer classification is not exposed;
+- normalized vector-mask classification is not exposed.
+
+These gaps are expected to appear as fixture failures in the comparison report. They are not converted into harness errors.
+
+The first corpus-v1 run establishes this rawpsd baseline:
+
+| Fixture | rawpsd 0.2.2 |
+| --- | --- |
+| `simple-pixel-layers-psd` | pass |
+| `simple-pixel-layers-psb` | fail — PSB rejected |
+| `nested-group` | pass |
+| `duplicate-layer-names` | pass |
+| `text-layer` | fail — normalized text-layer count unavailable |
+| `layer-masks` | fail — fixture rejected by parser |
+| `malformed-truncated-header` | pass — correctly rejected |
+
+Summary:
+
+```text
+passed:  4
+failed:  3
+skipped: 0
+errors:  0
+```
+
+This baseline is intentionally asserted by the spike tests so future rawpsd upgrades cannot silently change the comparison result.
 
 ### psd-tools reference runtime
 
@@ -138,7 +188,15 @@ Produce a report for one candidate:
 cargo run -p yu-psd-spike -- run psd-tools fixtures/psd/corpus.json
 ```
 
-For `psd-tools`, the command runs the pinned reference adapter when its Python environment is available. If the pinned runtime is absent or mismatched, fixture results are `skipped` with an explicit `unavailable` diagnostic. Rust-native and TypeScript candidates remain skeletons.
+For `psd-tools`, the command runs the pinned reference adapter when its Python environment is available. If the pinned runtime is absent or mismatched, fixture results are `skipped` with an explicit `unavailable` diagnostic.
+
+For `rust-native`, the command runs rawpsd directly in-process:
+
+```bash
+cargo run -p yu-psd-spike -- run rust-native fixtures/psd/corpus.json
+```
+
+TypeScript remains the only skeleton candidate.
 
 ## CI contract
 
@@ -151,9 +209,11 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
-PR #12 adds a separate three-platform `PSD Spike` gate. It installs Python 3.12 + psd-tools 1.20.0 and runs the ignored reference-conformance test against all seven corpus fixtures.
+PR #12 adds a separate three-platform `PSD Spike` gate for Python 3.12 + psd-tools 1.20.0. PR #13 adds a second three-platform job that runs the rawpsd candidate against the same corpus and prints its normalized report.
 
-Normal tests cover corpus validation, expected comparison semantics, path traversal rejection, the two remaining skeleton adapters, and graceful `unavailable` behavior when the reference Python runtime is missing.
+The rawpsd job requires the adapter to complete without harness errors; it does not require every fixture to pass, because unsupported capabilities are evidence for the M3 comparison.
+
+Normal tests cover corpus validation, expected comparison semantics, path traversal rejection, the remaining TypeScript skeleton, graceful `unavailable` behavior for the reference Python runtime, and rawpsd candidate execution.
 
 ## Follow-up direction
 
