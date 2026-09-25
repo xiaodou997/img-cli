@@ -70,7 +70,7 @@ def main() -> int:
             1 for layer in layers if layer.has_vector_mask()
         ),
     }
-    print(json.dumps(observation, ensure_ascii=False, separators=(",", ":")))
+    print(json.dumps(observation, separators=(",", ":")))
     return 0
 
 
