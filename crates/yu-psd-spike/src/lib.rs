@@ -500,8 +500,7 @@ impl AgPsdCandidateAdapter {
     }
 
     fn script_path() -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("adapters/typescript/ag_psd_candidate.cjs")
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters/typescript/ag_psd_candidate.cjs")
     }
 }
 
@@ -1051,7 +1050,7 @@ mod tests {
 
     #[test]
     #[ignore = "requires Node.js 22 with ag-psd 31.0.2"]
-    fn ag_psd_candidate_runs_committed_corpus_without_harness_errors() {
+    fn ag_psd_candidate_matches_committed_corpus() {
         let adapter = AgPsdCandidateAdapter::default();
         let report = run_candidate(&committed_corpus_path(), &adapter)
             .expect("ag-psd candidate should produce a report");
@@ -1060,12 +1059,10 @@ mod tests {
             "{}",
             serde_json::to_string_pretty(&report).expect("report should serialize")
         );
+        assert_eq!(report.summary.passed, 7);
+        assert_eq!(report.summary.failed, 0);
         assert_eq!(report.summary.skipped, 0);
         assert_eq!(report.summary.errors, 0);
-        assert_eq!(
-            report.summary.passed + report.summary.failed,
-            report.fixtures.len()
-        );
     }
 
     #[test]
