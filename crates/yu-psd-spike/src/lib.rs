@@ -930,6 +930,100 @@ impl PsdCandidateAdapter for PsdToolsReferenceAdapter {
             AdapterError::execution(format!("invalid psd-tools reference adapter JSON: {error}"))
         })
     }
+
+    fn export_layer(
+        &self,
+        input: &Path,
+        _fixture: &PsdFixture,
+        layer_name: &str,
+    ) -> Result<LayerExportObservation, AdapterError> {
+        let output = Command::new(&self.python)
+            .arg(Self::script_path())
+            .arg("--expected-version")
+            .arg(PSD_TOOLS_REFERENCE_VERSION)
+            .arg("--expected-python")
+            .arg(PSD_TOOLS_REFERENCE_PYTHON)
+            .arg("--mode")
+            .arg("export-layer")
+            .arg("--layer-name")
+            .arg(layer_name)
+            .arg(input)
+            .output()
+            .map_err(|error| {
+                AdapterError::unavailable(format!(
+                    "failed to start psd-tools layer export Python {:?}: {error}",
+                    self.python
+                ))
+            })?;
+
+        if !output.status.success() {
+            let diagnostic = String::from_utf8_lossy(&output.stderr).trim().to_owned();
+            let diagnostic = if diagnostic.is_empty() {
+                format!("psd-tools layer export exited with {}", output.status)
+            } else {
+                diagnostic
+            };
+            if output.status.code() == Some(3) {
+                return Err(AdapterError::unavailable(diagnostic));
+            }
+            return Err(AdapterError::execution(diagnostic));
+        }
+
+        serde_json::from_slice::<LayerExportObservation>(&output.stdout).map_err(|error| {
+            AdapterError::execution(format!(
+                "invalid psd-tools layer export JSON: {error}"
+            ))
+        })
+    }
+
+    fn benchmark(
+        &self,
+        input: &Path,
+        _fixture: &PsdFixture,
+        config: &BenchmarkConfig,
+    ) -> Result<BenchmarkObservation, AdapterError> {
+        let output = Command::new(&self.python)
+            .arg(Self::script_path())
+            .arg("--expected-version")
+            .arg(PSD_TOOLS_REFERENCE_VERSION)
+            .arg("--expected-python")
+            .arg(PSD_TOOLS_REFERENCE_PYTHON)
+            .arg("--mode")
+            .arg("benchmark")
+            .arg("--layer-name")
+            .arg(&config.layer_name)
+            .arg("--warmups")
+            .arg(config.warmup_iterations.to_string())
+            .arg("--samples")
+            .arg(config.sample_iterations.to_string())
+            .arg(input)
+            .output()
+            .map_err(|error| {
+                AdapterError::unavailable(format!(
+                    "failed to start psd-tools benchmark Python {:?}: {error}",
+                    self.python
+                ))
+            })?;
+
+        if !output.status.success() {
+            let diagnostic = String::from_utf8_lossy(&output.stderr).trim().to_owned();
+            let diagnostic = if diagnostic.is_empty() {
+                format!("psd-tools benchmark exited with {}", output.status)
+            } else {
+                diagnostic
+            };
+            if output.status.code() == Some(3) {
+                return Err(AdapterError::unavailable(diagnostic));
+            }
+            return Err(AdapterError::execution(diagnostic));
+        }
+
+        serde_json::from_slice::<BenchmarkObservation>(&output.stdout).map_err(|error| {
+            AdapterError::execution(format!(
+                "invalid psd-tools benchmark JSON: {error}"
+            ))
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -1006,6 +1100,96 @@ impl PsdCandidateAdapter for AgPsdCandidateAdapter {
 
         serde_json::from_slice::<AdapterObservation>(&output.stdout).map_err(|error| {
             AdapterError::execution(format!("invalid ag-psd candidate adapter JSON: {error}"))
+        })
+    }
+
+    fn export_layer(
+        &self,
+        input: &Path,
+        _fixture: &PsdFixture,
+        layer_name: &str,
+    ) -> Result<LayerExportObservation, AdapterError> {
+        let output = Command::new(&self.node)
+            .arg(Self::script_path())
+            .arg("--expected-version")
+            .arg(AG_PSD_CANDIDATE_VERSION)
+            .arg("--expected-node-major")
+            .arg(AG_PSD_CANDIDATE_NODE_MAJOR)
+            .arg("--mode")
+            .arg("export-layer")
+            .arg("--layer-name")
+            .arg(layer_name)
+            .arg(input)
+            .output()
+            .map_err(|error| {
+                AdapterError::unavailable(format!(
+                    "failed to start ag-psd layer export Node.js {:?}: {error}",
+                    self.node
+                ))
+            })?;
+
+        if !output.status.success() {
+            let diagnostic = String::from_utf8_lossy(&output.stderr).trim().to_owned();
+            let diagnostic = if diagnostic.is_empty() {
+                format!("ag-psd layer export exited with {}", output.status)
+            } else {
+                diagnostic
+            };
+            if output.status.code() == Some(3) {
+                return Err(AdapterError::unavailable(diagnostic));
+            }
+            return Err(AdapterError::execution(diagnostic));
+        }
+
+        serde_json::from_slice::<LayerExportObservation>(&output.stdout).map_err(|error| {
+            AdapterError::execution(format!("invalid ag-psd layer export JSON: {error}"))
+        })
+    }
+
+    fn benchmark(
+        &self,
+        input: &Path,
+        _fixture: &PsdFixture,
+        config: &BenchmarkConfig,
+    ) -> Result<BenchmarkObservation, AdapterError> {
+        let output = Command::new(&self.node)
+            .arg(Self::script_path())
+            .arg("--expected-version")
+            .arg(AG_PSD_CANDIDATE_VERSION)
+            .arg("--expected-node-major")
+            .arg(AG_PSD_CANDIDATE_NODE_MAJOR)
+            .arg("--mode")
+            .arg("benchmark")
+            .arg("--layer-name")
+            .arg(&config.layer_name)
+            .arg("--warmups")
+            .arg(config.warmup_iterations.to_string())
+            .arg("--samples")
+            .arg(config.sample_iterations.to_string())
+            .arg(input)
+            .output()
+            .map_err(|error| {
+                AdapterError::unavailable(format!(
+                    "failed to start ag-psd benchmark Node.js {:?}: {error}",
+                    self.node
+                ))
+            })?;
+
+        if !output.status.success() {
+            let diagnostic = String::from_utf8_lossy(&output.stderr).trim().to_owned();
+            let diagnostic = if diagnostic.is_empty() {
+                format!("ag-psd benchmark exited with {}", output.status)
+            } else {
+                diagnostic
+            };
+            if output.status.code() == Some(3) {
+                return Err(AdapterError::unavailable(diagnostic));
+            }
+            return Err(AdapterError::execution(diagnostic));
+        }
+
+        serde_json::from_slice::<BenchmarkObservation>(&output.stdout).map_err(|error| {
+            AdapterError::execution(format!("invalid ag-psd benchmark JSON: {error}"))
         })
     }
 }
