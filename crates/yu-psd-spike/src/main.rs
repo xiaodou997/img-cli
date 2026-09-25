@@ -40,8 +40,8 @@ fn run() -> Result<(), String> {
                 .into_iter()
                 .find(|adapter| adapter.descriptor().id == *candidate_id)
                 .ok_or_else(|| format!("unknown PSD candidate: {candidate_id}"))?;
-            let report =
-                run_candidate(Path::new(corpus), adapter.as_ref()).map_err(|error| error.to_string())?;
+            let report = run_candidate(Path::new(corpus), adapter.as_ref())
+                .map_err(|error| error.to_string())?;
             let json = serde_json::to_string_pretty(&report)
                 .map_err(|error| format!("failed to serialize report: {error}"))?;
             println!("{json}");
