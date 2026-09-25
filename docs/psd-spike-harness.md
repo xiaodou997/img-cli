@@ -231,6 +231,12 @@ List candidate descriptors:
 cargo run -p yu-psd-spike -- candidates
 ```
 
+Validate and print the frozen candidate comparison snapshot:
+
+```bash
+cargo run -p yu-psd-spike -- comparison docs/data/psd-candidate-comparison-v1.json
+```
+
 Produce a report for one candidate:
 
 ```bash
@@ -271,14 +277,37 @@ Candidate jobs require adapter execution without harness errors. A candidate is 
 
 Normal tests cover corpus validation, expected comparison semantics, path traversal rejection, all three wired descriptors, graceful `unavailable` behavior for missing external runtimes, and rawpsd candidate execution.
 
+## Candidate comparison snapshot
+
+PR #15 adds:
+
+- `docs/data/psd-candidate-comparison-v1.json` — machine-readable frozen evidence;
+- `docs/psd-candidate-comparison.md` — human-readable comparison report.
+
+The snapshot is validated by Rust tests against:
+
+- all three registered candidate IDs;
+- pinned candidate versions;
+- the 7-fixture corpus count;
+- psd-tools 7/7 baseline;
+- rawpsd 4/7 baseline and exact failed fixture set;
+- ag-psd 7/7 baseline;
+- `decision_state = evidence_only`;
+- `benchmark.status = not_measured`.
+
+A change to the machine-readable comparison baseline triggers the PSD Spike workflow so all candidate evidence can be reproduced before the snapshot moves.
+
 ## Follow-up direction
 
-Candidate integrations should land independently and use this same harness. A candidate PR should:
+PR #15 closes the first conformance/distribution comparison, but it does not make the engine decision. The highest-value remaining evidence gaps are:
 
-1. wire exactly one adapter;
-2. declare runtime/distribution requirements;
-3. add only fixture expectations needed for evidence;
-4. avoid changing another candidate to make its comparison easier;
-5. produce the same report schema.
+1. effects and Smart Object metadata fixtures;
+2. higher-bit-depth coverage;
+3. layer export conformance;
+4. rendering fidelity;
+5. round-trip/write safety;
+6. controlled parse/export/render benchmarks;
+7. controlled memory measurements;
+8. production packaging/update strategy for optional Python or Node runtimes.
 
-The M3 engine recommendation comes after representative corpus coverage and candidate runs, not from PR #10.
+The M3 engine strategy should explicitly state which of these gaps must be closed for the initial `inspect/tree/layer list` scope and which can be deferred.
