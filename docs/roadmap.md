@@ -131,7 +131,7 @@ Progress:
 - [x] pinned third-party fixture provenance/license receipts;
 - [x] Rust / psd-tools / TypeScript candidate adapter skeletons;
 - [x] machine-readable per-candidate report model;
-- [ ] representative redistributable PSD/PSB fixture corpus;
+- [x] representative redistributable PSD/PSB benchmark corpus;
 - [x] first Rust-native candidate integration (rawpsd 0.2.2);
 - [x] psd-tools 1.20.0 reference candidate integration (Python 3.12);
 - [x] TypeScript/Node candidate integration (ag-psd 31.0.2);
