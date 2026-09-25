@@ -357,6 +357,7 @@ impl Default for PsdToolsReferenceAdapter {
 }
 
 impl PsdToolsReferenceAdapter {
+    #[cfg(test)]
     fn with_python(python: impl Into<OsString>) -> Self {
         Self {
             python: python.into(),
