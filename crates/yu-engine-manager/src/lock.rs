@@ -7,8 +7,6 @@ use std::{
 #[derive(Debug)]
 pub struct EngineMutationLock {
     file: File,
-    pub engine_id: String,
-    pub path: PathBuf,
 }
 
 impl Drop for EngineMutationLock {
@@ -47,11 +45,7 @@ impl EngineManager {
             })?;
 
         match file.try_lock() {
-            Ok(()) => Ok(EngineMutationLock {
-                file,
-                engine_id: engine_id.to_owned(),
-                path,
-            }),
+            Ok(()) => Ok(EngineMutationLock { file }),
             Err(TryLockError::WouldBlock) => Err(ManagerError::Busy(format!(
                 "engine {engine_id} is being modified by another YuTool process"
             ))),
@@ -113,9 +107,6 @@ mod tests {
 
         let first = manager.acquire_engine_lock("engine-a").unwrap();
         let second = manager.acquire_engine_lock("engine-b").unwrap();
-
-        assert_eq!(first.engine_id, "engine-a");
-        assert_eq!(second.engine_id, "engine-b");
 
         drop(first);
         drop(second);
