@@ -1,0 +1,179 @@
+{
+  "schema_version": "1",
+  "observation_date": "2026-09-25",
+  "corpus": {
+    "path": "fixtures/psd/corpus.json",
+    "schema_version": "1",
+    "fixture_count": 7,
+    "covered_features": [
+      "simple_pixel_layers",
+      "psb",
+      "nested_groups",
+      "duplicate_layer_names",
+      "text_layers",
+      "pixel_masks",
+      "vector_masks",
+      "malformed_rejection"
+    ]
+  },
+  "decision_state": "evidence_only",
+  "benchmark": {
+    "status": "not_measured",
+    "reason": "Current CI fixture durations include process startup and runner noise and are not a controlled parse/render/memory benchmark."
+  },
+  "candidates": [
+    {
+      "id": "psd-tools",
+      "engine": "psd-tools",
+      "version": "1.20.0",
+      "runtime": "python",
+      "runtime_pin": "Python 3.12",
+      "license": "MIT",
+      "repository": "psd-tools/psd-tools",
+      "latest_observed_commit": "f1256273ffb9b39b9efa19d486c86f594c831f42",
+      "latest_observed_commit_date": "2026-09-25",
+      "distribution": {
+        "model": "external_runtime",
+        "core_dependency": false,
+        "direct_dependencies": [
+          "typing-extensions",
+          "attrs",
+          "Pillow",
+          "numpy"
+        ],
+        "optional_render_dependencies": [
+          "aggdraw",
+          "scipy",
+          "scikit-image"
+        ]
+      },
+      "corpus_result": {
+        "passed": 7,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0,
+        "failed_fixtures": []
+      },
+      "verified": {
+        "psd_parse": true,
+        "psb_parse": true,
+        "layer_hierarchy": true,
+        "duplicate_layer_names": true,
+        "text_layer_classification": true,
+        "pixel_mask_classification": true,
+        "vector_mask_classification": true,
+        "malformed_rejection": true
+      },
+      "upstream_api_evidence": {
+        "low_level_read_write": true,
+        "layer_image_export": true,
+        "compositing": "limited",
+        "mutation": "limited"
+      }
+    },
+    {
+      "id": "rust-native",
+      "engine": "rawpsd",
+      "version": "0.2.2",
+      "runtime": "rust_native",
+      "runtime_pin": "compiled into yu-psd-spike only",
+      "license": "CC0-1.0",
+      "repository": "wareya/rawpsd-rs",
+      "latest_observed_commit": "dfc8c07242fa648d17e2aeea7e1c0fb6b9ad2873",
+      "latest_observed_commit_date": "2025-05-11",
+      "distribution": {
+        "model": "in_process_rust",
+        "core_dependency": false,
+        "direct_dependencies": [],
+        "optional_render_dependencies": []
+      },
+      "corpus_result": {
+        "passed": 4,
+        "failed": 3,
+        "skipped": 0,
+        "errors": 0,
+        "failed_fixtures": [
+          "simple-pixel-layers-psb",
+          "text-layer",
+          "layer-masks"
+        ]
+      },
+      "verified": {
+        "psd_parse": true,
+        "psb_parse": false,
+        "layer_hierarchy": true,
+        "duplicate_layer_names": true,
+        "text_layer_classification": false,
+        "pixel_mask_classification": false,
+        "vector_mask_classification": false,
+        "malformed_rejection": true
+      },
+      "upstream_api_evidence": {
+        "low_level_read_write": false,
+        "layer_image_export": "raw_image_data_exposed",
+        "compositing": false,
+        "mutation": false
+      }
+    },
+    {
+      "id": "typescript-psd",
+      "engine": "ag-psd",
+      "version": "31.0.2",
+      "runtime": "node",
+      "runtime_pin": "Node.js 22",
+      "license": "MIT",
+      "repository": "Agamnentzar/ag-psd",
+      "latest_observed_commit": "387049670cb89b88fb8fe1b7c01aeacf98dd2e3b",
+      "latest_observed_commit_date": "2026-07-02",
+      "distribution": {
+        "model": "external_runtime",
+        "core_dependency": false,
+        "direct_dependencies": [
+          "base64-js",
+          "pako"
+        ],
+        "optional_render_dependencies": [
+          "node-canvas"
+        ]
+      },
+      "corpus_result": {
+        "passed": 7,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0,
+        "failed_fixtures": []
+      },
+      "verified": {
+        "psd_parse": true,
+        "psb_parse": true,
+        "layer_hierarchy": true,
+        "duplicate_layer_names": true,
+        "text_layer_classification": true,
+        "pixel_mask_classification": true,
+        "vector_mask_classification": true,
+        "malformed_rejection": true
+      },
+      "upstream_api_evidence": {
+        "low_level_read_write": true,
+        "layer_image_export": true,
+        "compositing": "requires_canvas_for_bitmap_workflows",
+        "mutation": true
+      },
+      "notes": [
+        "The current upstream README still contains an outdated PSB limitation line.",
+        "Upstream changelog records PSB support since v12.1.0 and the pinned 31.0.2 candidate passes the committed PSB fixture."
+      ]
+    }
+  ],
+  "decision_gaps": [
+    "representative effects fixtures",
+    "smart object metadata fixtures",
+    "higher bit-depth fixtures",
+    "layer export conformance",
+    "rendering fidelity",
+    "round-trip/write safety",
+    "controlled performance benchmark",
+    "controlled memory benchmark",
+    "production distribution strategy for optional runtimes"
+  ]
+}
