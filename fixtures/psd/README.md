@@ -36,7 +36,7 @@ The corpus is intentionally small. Effects, Smart Objects, blend modes, higher b
 
 The upstream fixtures in `upstream/psd-tools/` are copied from `psd-tools/psd-tools` at commit `f1256273ffb9b39b9efa19d486c86f594c831f42` under its MIT license. See `THIRD_PARTY.md` and `licenses/psd-tools-MIT.txt`.
 
-The duplicate-name fixture is a YuTool derivative of the upstream `2layers.psd`: only its Pascal/Unicode layer names are normalized to `X`, preserving the original document structure.
+The duplicate-name fixture is a YuTool derivative of the upstream `2layers.psd`: only its Unicode `luni` layer names are normalized to `X`; legacy Pascal names and the original document structure are preserved.
 
 ## Coverage tags
 
