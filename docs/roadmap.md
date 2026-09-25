@@ -112,6 +112,12 @@ Exit criteria:
 - a managed engine can be installed, verified, activated, listed, used, and removed;
 - a compatible system engine can be discovered without YuTool taking ownership of it.
 
+### M2 Freeze
+
+M2 functional behavior is frozen at `d95ccae8cdaefd4ea63a35d39d6ec803748036e8`. PR #9 records the accepted Engine Manager, lifecycle, unified inventory, CLI, security, and schema-v1 compatibility baseline in `docs/milestones/m2-freeze.md`.
+
+M3 may extend YuTool with PSD capabilities and new engines, but should not casually break the M2 lifecycle or inventory contracts.
+
 ## M3 — PSD engine spike
 
 **Goal:** select a practical PSD/PSB strategy based on fixtures rather than assumptions.

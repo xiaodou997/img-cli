@@ -1,8 +1,8 @@
 # Managed Engine Installation Pipeline
 
-> Status: **M2 internal installer**
+> Status: **M2 implemented / frozen baseline**
 
-This document describes the internal installation contract. The public `yu engine install` command is intentionally not enabled until this pipeline is proven.
+This document describes the verified installation contract used by the public `yu engine install --manifest <file>` command.
 
 ## Goals
 
@@ -106,14 +106,12 @@ Both locations are inside the same YuTool data root so the normal case stays on 
 
 If the destination version already exists, installation stops with `AlreadyInstalled`; YuTool never replaces that version implicitly.
 
-## Deferred public surface
+## Public surface
 
-This PR does not expose:
+The verified installer is exposed through:
 
 ```bash
-yu engine install
-yu engine remove
-yu engine update
+yu engine install --manifest <file>
 ```
 
-Those commands should be added only after the installer and remover lifecycle are both covered by integration tests.
+Installation does not activate the version automatically. Activation is an explicit lifecycle operation.
