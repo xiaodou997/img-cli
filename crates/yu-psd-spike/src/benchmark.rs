@@ -14,6 +14,7 @@ use std::process::Command;
 use std::time::Instant;
 
 pub const BENCHMARK_SCHEMA_VERSION: &str = "1";
+pub const BENCHMARK_SUITE_SCHEMA_VERSION: &str = "1";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BenchmarkPlan {
@@ -25,6 +26,27 @@ pub struct BenchmarkPlan {
     pub layer_export_candidates: Vec<String>,
     pub ranking_allowed: bool,
     pub purpose: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BenchmarkSuitePlan {
+    pub schema_version: String,
+    pub suite_id: String,
+    pub corpus_path: String,
+    pub ranking_allowed: bool,
+    pub canonical_report_platform: String,
+    pub plans: Vec<String>,
+    pub purpose: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BenchmarkSuiteReport {
+    pub schema_version: String,
+    pub suite_id: String,
+    pub ranking_allowed: bool,
+    pub canonical_report_platform: String,
+    pub environment: BenchmarkEnvironment,
+    pub reports: Vec<BenchmarkReport>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -108,6 +130,99 @@ struct ExternalBenchmarkObservation {
     total_rgba_bytes: usize,
     export_checksum_sha256: String,
     peak_rss_bytes: u64,
+}
+
+pub fn load_benchmark_suite_plan(path: &Path) -> Result<BenchmarkSuitePlan, CorpusError> {
+    let content = fs::read_to_string(path).map_err(|error| {
+        CorpusError::new(format!(
+            "failed to read PSD benchmark suite {}: {error}",
+            path.display()
+        ))
+    })?;
+    let suite = serde_json::from_str::<BenchmarkSuitePlan>(&content).map_err(|error| {
+        CorpusError::new(format!(
+            "failed to parse PSD benchmark suite {}: {error}",
+            path.display()
+        ))
+    })?;
+    validate_benchmark_suite_plan(&suite)?;
+    Ok(suite)
+}
+
+pub fn validate_benchmark_suite_plan(suite: &BenchmarkSuitePlan) -> Result<(), CorpusError> {
+    if suite.schema_version != BENCHMARK_SUITE_SCHEMA_VERSION {
+        return Err(CorpusError::new(format!(
+            "unsupported PSD benchmark suite schema {}; expected {}",
+            suite.schema_version, BENCHMARK_SUITE_SCHEMA_VERSION
+        )));
+    }
+    if suite.suite_id.trim().is_empty() {
+        return Err(CorpusError::new("PSD benchmark suite_id must not be empty"));
+    }
+    if suite.corpus_path.trim().is_empty() {
+        return Err(CorpusError::new(
+            "PSD benchmark suite corpus_path must not be empty",
+        ));
+    }
+    if suite.canonical_report_platform.trim().is_empty() {
+        return Err(CorpusError::new(
+            "PSD benchmark suite canonical_report_platform must not be empty",
+        ));
+    }
+    if suite.ranking_allowed {
+        return Err(CorpusError::new(
+            "representative PSD benchmark suite v2 must not allow ranking",
+        ));
+    }
+    if suite.plans.is_empty() {
+        return Err(CorpusError::new(
+            "PSD benchmark suite must contain at least one workload plan",
+        ));
+    }
+
+    let mut unique = HashSet::new();
+    for plan in &suite.plans {
+        if plan.trim().is_empty() {
+            return Err(CorpusError::new(
+                "PSD benchmark suite plan path must not be empty",
+            ));
+        }
+        if !unique.insert(plan.as_str()) {
+            return Err(CorpusError::new(format!(
+                "duplicate PSD benchmark suite plan: {plan}"
+            )));
+        }
+    }
+
+    Ok(())
+}
+
+pub fn run_benchmark_suite(path: &Path) -> Result<BenchmarkSuiteReport, CorpusError> {
+    let suite = load_benchmark_suite_plan(path)?;
+    let corpus_path = Path::new(&suite.corpus_path);
+    let mut reports = Vec::with_capacity(suite.plans.len());
+
+    for plan in &suite.plans {
+        let report = run_benchmark(corpus_path, Path::new(plan))?;
+        if report.ranking_allowed {
+            return Err(CorpusError::new(format!(
+                "PSD benchmark workload {plan} unexpectedly enables ranking"
+            )));
+        }
+        reports.push(report);
+    }
+
+    Ok(BenchmarkSuiteReport {
+        schema_version: BENCHMARK_SUITE_SCHEMA_VERSION.to_owned(),
+        suite_id: suite.suite_id,
+        ranking_allowed: suite.ranking_allowed,
+        canonical_report_platform: suite.canonical_report_platform,
+        environment: BenchmarkEnvironment {
+            os: env::consts::OS.to_owned(),
+            arch: env::consts::ARCH.to_owned(),
+        },
+        reports,
+    })
 }
 
 pub fn load_benchmark_plan(path: &Path) -> Result<BenchmarkPlan, CorpusError> {
@@ -771,6 +886,11 @@ mod tests {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/data/psd-benchmark-plan-v1.json")
     }
 
+    fn representative_suite_path() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../docs/data/psd-benchmark-suite-v2.json")
+    }
+
     #[test]
     fn committed_benchmark_plan_is_valid_and_non_ranking() {
         let plan = load_benchmark_plan(&committed_plan_path())
@@ -780,6 +900,17 @@ mod tests {
         assert!(!plan.ranking_allowed);
         assert_eq!(plan.candidates.len(), 3);
         assert_eq!(plan.layer_export_candidates.len(), 2);
+    }
+
+    #[test]
+    fn representative_suite_is_valid_and_non_ranking() {
+        let suite = load_benchmark_suite_plan(&representative_suite_path())
+            .expect("representative benchmark suite should load");
+        assert_eq!(suite.schema_version, BENCHMARK_SUITE_SCHEMA_VERSION);
+        assert_eq!(suite.suite_id, "m3-representative-v2");
+        assert!(!suite.ranking_allowed);
+        assert_eq!(suite.canonical_report_platform, "ubuntu-latest");
+        assert_eq!(suite.plans.len(), 7);
     }
 
     #[test]
