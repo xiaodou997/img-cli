@@ -1,6 +1,6 @@
 # M2 Freeze Receipt
 
-> Status: **Freeze candidate** until PR #9 is merged.
+> Status: **Frozen**
 
 M2 establishes the Engine Manager and engine-discovery baseline for YuTool. Later milestones may add new capabilities and engine integrations, but should not casually break the contracts recorded here.
 
@@ -13,7 +13,11 @@ M2 establishes the Engine Manager and engine-discovery baseline for YuTool. Late
 - M2 functional baseline: `d95ccae8cdaefd4ea63a35d39d6ec803748036e8`
 - Freeze PR: #9
 
-The final documentation freeze commit is recorded after PR #9 merges. M2 functionality itself is pinned to `d95ccae`.
+- M2 Freeze PR: #9
+- M2 documentation freeze commit: `f4f6f922a8aee741a24c9e413ba03b1fa641f96a`
+- CI: Rustfmt + Ubuntu/macOS/Windows check, Clippy and tests passed.
+
+M2 functionality itself remains pinned to `d95ccae`.
 
 ## M2 scope
 
