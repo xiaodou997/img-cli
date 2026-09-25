@@ -1,0 +1,7 @@
+{
+  "schema_version": "1",
+  "fixture_id": "simple-pixel-layers-psd",
+  "layer_name": "Слой",
+  "warmup_iterations": 2,
+  "sample_iterations": 5
+}
