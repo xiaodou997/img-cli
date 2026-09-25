@@ -104,7 +104,7 @@
       },
       "provenance": {
         "kind": "redistributable",
-        "source": "YuTool derivative of psd-tools 2layers.psd; Pascal and Unicode layer names normalized to X",
+        "source": "YuTool derivative of psd-tools 2layers.psd; Unicode layer names normalized to X while legacy Pascal names are preserved",
         "license": "MIT",
         "redistributable": true,
         "upstream_commit": "f1256273ffb9b39b9efa19d486c86f594c831f42",
