@@ -14,6 +14,8 @@ pub const REPORT_SCHEMA_VERSION: &str = "1";
 pub const PSD_TOOLS_REFERENCE_VERSION: &str = "1.20.0";
 pub const PSD_TOOLS_REFERENCE_PYTHON: &str = "3.12";
 pub const RAWPSD_CANDIDATE_VERSION: &str = "0.2.2";
+pub const AG_PSD_CANDIDATE_VERSION: &str = "31.0.2";
+pub const AG_PSD_CANDIDATE_NODE_MAJOR: &str = "22";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PsdCorpus {
@@ -303,47 +305,6 @@ pub trait PsdCandidateAdapter {
     ) -> Result<AdapterObservation, AdapterError>;
 }
 
-#[derive(Debug, Clone)]
-struct SkeletonAdapter {
-    descriptor: CandidateDescriptor,
-}
-
-impl SkeletonAdapter {
-    fn new(
-        id: &str,
-        display_name: &str,
-        runtime: CandidateRuntime,
-        notes: &str,
-    ) -> SkeletonAdapter {
-        Self {
-            descriptor: CandidateDescriptor {
-                id: id.to_owned(),
-                display_name: display_name.to_owned(),
-                runtime,
-                status: CandidateStatus::Skeleton,
-                notes: notes.to_owned(),
-            },
-        }
-    }
-}
-
-impl PsdCandidateAdapter for SkeletonAdapter {
-    fn descriptor(&self) -> CandidateDescriptor {
-        self.descriptor.clone()
-    }
-
-    fn inspect(
-        &self,
-        _input: &Path,
-        _fixture: &PsdFixture,
-    ) -> Result<AdapterObservation, AdapterError> {
-        Err(AdapterError::unavailable(format!(
-            "{} is an M3 adapter skeleton and is not wired to an engine yet",
-            self.descriptor.id
-        )))
-    }
-}
-
 #[derive(Debug, Clone, Copy, Default)]
 struct RawPsdCandidateAdapter;
 
@@ -518,16 +479,90 @@ impl PsdCandidateAdapter for PsdToolsReferenceAdapter {
     }
 }
 
+#[derive(Debug, Clone)]
+struct AgPsdCandidateAdapter {
+    node: OsString,
+}
+
+impl Default for AgPsdCandidateAdapter {
+    fn default() -> Self {
+        let node = env::var_os("YU_TYPESCRIPT_PSD_NODE")
+            .filter(|value| !value.is_empty())
+            .unwrap_or_else(|| OsString::from("node"));
+        Self { node }
+    }
+}
+
+impl AgPsdCandidateAdapter {
+    #[cfg(test)]
+    fn with_node(node: impl Into<OsString>) -> Self {
+        Self { node: node.into() }
+    }
+
+    fn script_path() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("adapters/typescript/ag_psd_candidate.cjs")
+    }
+}
+
+impl PsdCandidateAdapter for AgPsdCandidateAdapter {
+    fn descriptor(&self) -> CandidateDescriptor {
+        CandidateDescriptor {
+            id: "typescript-psd".to_owned(),
+            display_name: format!("ag-psd {AG_PSD_CANDIDATE_VERSION} candidate"),
+            runtime: CandidateRuntime::TypeScriptNode,
+            status: CandidateStatus::Wired,
+            notes: format!(
+                "TypeScript/Node candidate pinned to Node.js {AG_PSD_CANDIDATE_NODE_MAJOR} + ag-psd {AG_PSD_CANDIDATE_VERSION}; set YU_TYPESCRIPT_PSD_NODE to select the Node executable."
+            ),
+        }
+    }
+
+    fn inspect(
+        &self,
+        input: &Path,
+        _fixture: &PsdFixture,
+    ) -> Result<AdapterObservation, AdapterError> {
+        let output = Command::new(&self.node)
+            .arg(Self::script_path())
+            .arg("--expected-version")
+            .arg(AG_PSD_CANDIDATE_VERSION)
+            .arg("--expected-node-major")
+            .arg(AG_PSD_CANDIDATE_NODE_MAJOR)
+            .arg(input)
+            .output()
+            .map_err(|error| {
+                AdapterError::unavailable(format!(
+                    "failed to start ag-psd candidate Node.js {:?}: {error}",
+                    self.node
+                ))
+            })?;
+
+        if !output.status.success() {
+            let diagnostic = String::from_utf8_lossy(&output.stderr).trim().to_owned();
+            let diagnostic = if diagnostic.is_empty() {
+                format!("ag-psd candidate adapter exited with {}", output.status)
+            } else {
+                diagnostic
+            };
+
+            if output.status.code() == Some(3) {
+                return Err(AdapterError::unavailable(diagnostic));
+            }
+            return Err(AdapterError::execution(diagnostic));
+        }
+
+        serde_json::from_slice::<AdapterObservation>(&output.stdout).map_err(|error| {
+            AdapterError::execution(format!("invalid ag-psd candidate adapter JSON: {error}"))
+        })
+    }
+}
+
 pub fn candidate_adapters() -> Vec<Box<dyn PsdCandidateAdapter>> {
     vec![
         Box::new(RawPsdCandidateAdapter),
         Box::new(PsdToolsReferenceAdapter::default()),
-        Box::new(SkeletonAdapter::new(
-            "typescript-psd",
-            "TypeScript PSD candidate",
-            CandidateRuntime::TypeScriptNode,
-            "Reserved for TypeScript/Node PSD implementations evaluated during M3.",
-        )),
+        Box::new(AgPsdCandidateAdapter::default()),
     ]
 }
 
@@ -872,24 +907,18 @@ mod tests {
     }
 
     #[test]
-    fn remaining_candidate_skeletons_skip_without_selecting_an_engine() {
-        let fixture_count = load_corpus(&committed_corpus_path())
-            .expect("committed corpus should load")
-            .fixtures
-            .len();
-        let skeletons = candidate_adapters()
+    fn all_m3_candidate_slots_are_wired() {
+        let descriptors = candidate_adapters()
             .into_iter()
-            .filter(|adapter| adapter.descriptor().status == CandidateStatus::Skeleton)
+            .map(|adapter| adapter.descriptor())
             .collect::<Vec<_>>();
 
-        assert_eq!(skeletons.len(), 1);
-        for adapter in skeletons {
-            let report = run_candidate(&committed_corpus_path(), adapter.as_ref())
-                .expect("skeleton adapter should produce a report");
-            assert_eq!(report.summary.skipped, fixture_count);
-            assert_eq!(report.summary.failed, 0);
-            assert_eq!(report.summary.errors, 0);
-        }
+        assert_eq!(descriptors.len(), 3);
+        assert!(
+            descriptors
+                .iter()
+                .all(|descriptor| descriptor.status == CandidateStatus::Wired)
+        );
     }
 
     #[test]
@@ -983,6 +1012,60 @@ mod tests {
         assert_eq!(report.summary.failed, 0);
         assert_eq!(report.summary.skipped, 0);
         assert_eq!(report.summary.errors, 0);
+    }
+
+    #[test]
+    fn ag_psd_candidate_is_wired_but_optional() {
+        let adapter = candidate_adapters()
+            .into_iter()
+            .find(|adapter| adapter.descriptor().id == "typescript-psd")
+            .expect("TypeScript candidate must be registered");
+        let descriptor = adapter.descriptor();
+
+        assert_eq!(descriptor.status, CandidateStatus::Wired);
+        assert_eq!(descriptor.runtime, CandidateRuntime::TypeScriptNode);
+        assert!(descriptor.display_name.contains("ag-psd"));
+        assert!(descriptor.notes.contains(AG_PSD_CANDIDATE_VERSION));
+        assert!(descriptor.notes.contains(AG_PSD_CANDIDATE_NODE_MAJOR));
+    }
+
+    #[test]
+    fn ag_psd_missing_node_is_reported_as_unavailable() {
+        let corpus = load_corpus(&committed_corpus_path()).expect("committed corpus should load");
+        let fixture = corpus
+            .fixtures
+            .first()
+            .expect("committed corpus must contain a fixture");
+        let root = committed_corpus_path()
+            .parent()
+            .expect("corpus path must have a parent")
+            .to_path_buf();
+        let adapter =
+            AgPsdCandidateAdapter::with_node("yu-psd-spike-definitely-missing-node-runtime");
+
+        let error = adapter
+            .inspect(&root.join(&fixture.path), fixture)
+            .expect_err("missing Node.js must not be treated as execution success");
+        assert_eq!(error.kind, AdapterErrorKind::Unavailable);
+    }
+
+    #[test]
+    #[ignore = "requires Node.js 22 with ag-psd 31.0.2"]
+    fn ag_psd_candidate_runs_committed_corpus_without_harness_errors() {
+        let adapter = AgPsdCandidateAdapter::default();
+        let report = run_candidate(&committed_corpus_path(), &adapter)
+            .expect("ag-psd candidate should produce a report");
+
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&report).expect("report should serialize")
+        );
+        assert_eq!(report.summary.skipped, 0);
+        assert_eq!(report.summary.errors, 0);
+        assert_eq!(
+            report.summary.passed + report.summary.failed,
+            report.fixtures.len()
+        );
     }
 
     #[test]
