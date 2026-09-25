@@ -135,7 +135,8 @@ Progress:
 - [x] first Rust-native candidate integration (rawpsd 0.2.2);
 - [x] psd-tools 1.20.0 reference candidate integration (Python 3.12);
 - [x] TypeScript/Node candidate integration (ag-psd 31.0.2);
-- [ ] benchmark/conformance comparison report;
+- [x] candidate comparison report v1 (conformance, distribution, maintenance evidence);
+- [ ] controlled performance/memory benchmark report;
 - [ ] PSD engine strategy decision.
 
 Build a representative fixture corpus covering, where legally distributable:

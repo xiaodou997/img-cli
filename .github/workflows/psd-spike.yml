@@ -5,6 +5,7 @@ on:
     paths:
       - "crates/yu-psd-spike/**"
       - "fixtures/psd/**"
+      - "docs/data/psd-candidate-comparison-v1.json"
       - ".github/workflows/psd-spike.yml"
   workflow_dispatch:
 
