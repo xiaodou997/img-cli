@@ -71,6 +71,7 @@ impl EngineManager {
     ) -> Result<Option<String>, ManagerError> {
         ensure_managed(descriptor)?;
         validate_identifier("engine id", &descriptor.id)?;
+        let _lock = self.acquire_engine_lock(&descriptor.id)?;
 
         let Some(state) = self.read_active_state(&descriptor.id)? else {
             return Ok(None);
@@ -154,6 +155,7 @@ impl EngineManager {
         ensure_managed(descriptor)?;
         validate_identifier("engine id", &descriptor.id)?;
         validate_version_segment(version)?;
+        let _lock = self.acquire_engine_lock(&descriptor.id)?;
 
         let metadata = self.read_installed_metadata(&descriptor.id, version)?;
         ensure_metadata_matches_target(self, &metadata)?;
@@ -243,6 +245,7 @@ impl EngineManager {
         ensure_managed(descriptor)?;
         validate_identifier("engine id", &descriptor.id)?;
         validate_version_segment(version)?;
+        let _lock = self.acquire_engine_lock(&descriptor.id)?;
 
         if self.active_version(descriptor)?.as_deref() == Some(version) {
             return Err(ManagerError::ActiveVersion(format!(

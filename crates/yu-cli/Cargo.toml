@@ -14,7 +14,9 @@ serde_json.workspace = true
 yu-capability-image = { path = "../yu-capability-image" }
 yu-core = { path = "../yu-core" }
 yu-engine-image-rs = { path = "../yu-engine-image-rs" }
+yu-engine-manager = { path = "../yu-engine-manager" }
 
 [dev-dependencies]
 image.workspace = true
 serde_json.workspace = true
+sha2.workspace = true

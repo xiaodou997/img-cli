@@ -1,5 +1,10 @@
 use image::{Rgba, RgbaImage};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
+use yu_engine_manager::{
+    ArchiveKind, Downloader, EngineInstaller, EngineManager, EngineManifest, EnginePackage,
+    EngineTarget, ManagedLayout, ManagerError, MANIFEST_SCHEMA_VERSION,
+};
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -10,6 +15,14 @@ use std::{
 fn run(args: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_yu"))
         .args(args)
+        .output()
+        .expect("yu should execute")
+}
+
+fn run_with_data_home(args: &[&str], data_home: &Path) -> Output {
+    Command::new(env!("CARGO_BIN_EXE_yu"))
+        .args(args)
+        .env("YU_DATA_HOME", data_home)
         .output()
         .expect("yu should execute")
 }
@@ -194,4 +207,138 @@ fn explicit_incompatible_engine_returns_structured_error() {
     assert_eq!(json["error"]["code"], "ENGINE_INCOMPATIBLE");
 
     let _ = fs::remove_file(input);
+}
+
+
+#[derive(Clone)]
+struct FixtureDownloader {
+    bytes: Vec<u8>,
+}
+
+impl Downloader for FixtureDownloader {
+    fn download(&self, _url: &str, destination: &Path) -> Result<u64, ManagerError> {
+        fs::write(destination, &self.bytes)
+            .map_err(|error| ManagerError::Io(format!("fixture download failed: {error}")))?;
+        Ok(self.bytes.len() as u64)
+    }
+}
+
+fn fixture_sha256(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    format!("{:x}", hasher.finalize())
+}
+
+fn install_fixture_engine(data_home: &Path, version: &str) {
+    let bytes = format!("fixture-{version}").into_bytes();
+    let target = EngineTarget::current();
+    let manifest = EngineManifest {
+        schema_version: MANIFEST_SCHEMA_VERSION.to_owned(),
+        id: "fixture-engine".to_owned(),
+        display_name: "Fixture Engine".to_owned(),
+        version: version.to_owned(),
+        capabilities: vec!["fixture.run".to_owned()],
+        packages: vec![EnginePackage {
+            target: target.clone(),
+            url: "https://example.invalid/fixture".to_owned(),
+            sha256: fixture_sha256(&bytes),
+            archive: ArchiveKind::Raw,
+            entrypoint: "bin/fixture".to_owned(),
+        }],
+    };
+    let manager = EngineManager::new(ManagedLayout::new(data_home), target);
+    let installer = EngineInstaller::new(manager, FixtureDownloader { bytes });
+    installer.install(&manifest).expect("fixture install should succeed");
+}
+
+#[test]
+fn engine_versions_activate_deactivate_remove_round_trip() {
+    let root = temp_path("engine-lifecycle", "dir");
+    fs::create_dir_all(&root).unwrap();
+    install_fixture_engine(&root, "1.0.0");
+    install_fixture_engine(&root, "2.0.0");
+
+    let output = run_with_data_home(
+        &["engine", "versions", "fixture-engine", "--json"],
+        &root,
+    );
+    let json = parse_stdout(&output);
+    assert_eq!(json["operation"], "engine.versions");
+    assert_eq!(json["result"].as_array().unwrap().len(), 2);
+
+    let output = run_with_data_home(
+        &["engine", "activate", "fixture-engine", "2.0.0", "--json"],
+        &root,
+    );
+    let json = parse_stdout(&output);
+    assert_eq!(json["operation"], "engine.activate");
+    assert_eq!(json["result"]["active_version"], "2.0.0");
+
+    let output = run_with_data_home(
+        &["engine", "remove", "fixture-engine", "2.0.0", "--json"],
+        &root,
+    );
+    assert_eq!(output.status.code(), Some(2));
+    let error: Value = serde_json::from_slice(&output.stderr).unwrap();
+    assert_eq!(error["error"]["code"], "OUTPUT_CONFLICT");
+
+    let output = run_with_data_home(
+        &["engine", "deactivate", "fixture-engine", "--json"],
+        &root,
+    );
+    let json = parse_stdout(&output);
+    assert_eq!(json["operation"], "engine.deactivate");
+    assert_eq!(json["result"]["previous_version"], "2.0.0");
+
+    let output = run_with_data_home(
+        &["engine", "remove", "fixture-engine", "2.0.0", "--json"],
+        &root,
+    );
+    let json = parse_stdout(&output);
+    assert_eq!(json["operation"], "engine.remove");
+    assert_eq!(json["result"]["version"], "2.0.0");
+
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn engine_install_rejects_invalid_manifest_before_network() {
+    let root = temp_path("engine-invalid", "dir");
+    fs::create_dir_all(&root).unwrap();
+    let manifest_path = root.join("manifest.json");
+    fs::write(
+        &manifest_path,
+        r#"{
+          "schema_version":"1",
+          "id":"fixture-engine",
+          "display_name":"Fixture",
+          "version":"1.0.0",
+          "capabilities":[],
+          "packages":[{
+            "target":{"os":"linux","arch":"x86_64"},
+            "url":"http://example.invalid/fixture",
+            "sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "archive":"raw",
+            "entrypoint":"bin/fixture"
+          }]
+        }"#,
+    )
+    .unwrap();
+
+    let output = run_with_data_home(
+        &[
+            "engine",
+            "install",
+            "--manifest",
+            manifest_path.to_str().unwrap(),
+            "--json",
+        ],
+        &root,
+    );
+
+    assert_eq!(output.status.code(), Some(2));
+    let json: Value = serde_json::from_slice(&output.stderr).unwrap();
+    assert_eq!(json["error"]["code"], "INVALID_INPUT");
+
+    let _ = fs::remove_dir_all(root);
 }

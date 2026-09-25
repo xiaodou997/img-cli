@@ -64,21 +64,45 @@ Provider classes:
 - `managed`
 - `system`
 
-### `yu engine install` — planned
+### `yu engine install`
+
+Install a YuTool-managed engine from a local manifest.
 
 ```bash
-yu engine install <engine-id>
+yu engine install --manifest ./imagemagick.json
+yu engine install --manifest ./imagemagick.json --json
 ```
 
-Installation must be explicit. YuTool must not silently install an engine while executing an unrelated operation.
+Installation is explicit and does not activate the version automatically.
 
-### `yu engine remove` — planned
+### `yu engine versions`
 
 ```bash
-yu engine remove <engine-id>
+yu engine versions imagemagick
+yu engine versions imagemagick --json
 ```
 
-This command must not uninstall a system package that YuTool does not own.
+Lists installed managed versions and marks the active version.
+
+### `yu engine activate`
+
+```bash
+yu engine activate imagemagick 7.1.2
+```
+
+### `yu engine deactivate`
+
+```bash
+yu engine deactivate imagemagick
+```
+
+### `yu engine remove`
+
+```bash
+yu engine remove imagemagick 7.1.1
+```
+
+The active version cannot be removed. Built-in and system engines are outside the managed lifecycle and are never uninstalled by this command.
 
 ## Image commands
 
