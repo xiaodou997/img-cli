@@ -36,9 +36,10 @@ if (actualNodeMajor !== expectedNodeMajor) {
 
 let readPsd;
 let getLayerImageData;
+let initializeCanvas;
 let packageVersion;
 try {
-  ({ readPsd, getLayerImageData } = require("ag-psd"));
+  ({ readPsd, getLayerImageData, initializeCanvas } = require("ag-psd"));
   packageVersion = require("ag-psd/package.json").version;
 } catch (error) {
   unavailable(
@@ -55,6 +56,20 @@ if (packageVersion !== expectedVersion) {
       packageVersion
   );
 }
+
+// getLayerImageData() allocates through ag-psd's createImageData hook even
+// with useRawData enabled. Supply a pure in-memory ImageData implementation
+// so the benchmark does not require node-canvas or a native graphics runtime.
+initializeCanvas(
+  () => {
+    throw new Error("canvas allocation is disabled in the PSD benchmark");
+  },
+  (width, height) => ({
+    width,
+    height,
+    data: new Uint8ClampedArray(width * height * 4),
+  })
+);
 
 const buffer = fs.readFileSync(input);
 
