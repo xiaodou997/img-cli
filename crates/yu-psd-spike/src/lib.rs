@@ -1202,6 +1202,257 @@ pub fn candidate_adapters() -> Vec<Box<dyn PsdCandidateAdapter>> {
     ]
 }
 
+pub fn load_benchmark_config(path: &Path) -> Result<BenchmarkConfig, CorpusError> {
+    let content = fs::read_to_string(path).map_err(|error| {
+        CorpusError::new(format!(
+            "failed to read PSD benchmark config {}: {error}",
+            path.display()
+        ))
+    })?;
+    serde_json::from_str::<BenchmarkConfig>(&content).map_err(|error| {
+        CorpusError::new(format!(
+            "failed to parse PSD benchmark config {}: {error}",
+            path.display()
+        ))
+    })
+}
+
+pub fn validate_benchmark_config(
+    config: &BenchmarkConfig,
+    corpus: &PsdCorpus,
+) -> Result<(), CorpusError> {
+    if config.schema_version != BENCHMARK_SCHEMA_VERSION {
+        return Err(CorpusError::new(format!(
+            "unsupported PSD benchmark schema {}; expected {}",
+            config.schema_version, BENCHMARK_SCHEMA_VERSION
+        )));
+    }
+    if config.fixture_id.trim().is_empty() {
+        return Err(CorpusError::new(
+            "PSD benchmark fixture_id must not be empty",
+        ));
+    }
+    if config.layer_name.trim().is_empty() {
+        return Err(CorpusError::new(
+            "PSD benchmark layer_name must not be empty",
+        ));
+    }
+    if config.sample_iterations == 0 {
+        return Err(CorpusError::new(
+            "PSD benchmark sample_iterations must be greater than zero",
+        ));
+    }
+    if config.sample_iterations > 1000 || config.warmup_iterations > 1000 {
+        return Err(CorpusError::new(
+            "PSD benchmark iteration count must not exceed 1000",
+        ));
+    }
+
+    let fixture = corpus
+        .fixtures
+        .iter()
+        .find(|fixture| fixture.id == config.fixture_id)
+        .ok_or_else(|| {
+            CorpusError::new(format!(
+                "PSD benchmark fixture not found in corpus: {}",
+                config.fixture_id
+            ))
+        })?;
+    if !matches!(fixture.expected.parse, ParseExpectation::Accept) {
+        return Err(CorpusError::new(format!(
+            "PSD benchmark fixture {} must be an accepted input",
+            fixture.id
+        )));
+    }
+
+    Ok(())
+}
+
+fn benchmark_fixture<'a>(
+    corpus: &'a PsdCorpus,
+    fixture_id: &str,
+) -> Result<&'a PsdFixture, CorpusError> {
+    corpus
+        .fixtures
+        .iter()
+        .find(|fixture| fixture.id == fixture_id)
+        .ok_or_else(|| {
+            CorpusError::new(format!(
+                "PSD benchmark/export fixture not found: {fixture_id}"
+            ))
+        })
+}
+
+fn validate_layer_export_observation(
+    observation: &LayerExportObservation,
+) -> Result<(), CorpusError> {
+    if observation.pixel_format != "rgba8" {
+        return Err(CorpusError::new(format!(
+            "unsupported layer export pixel format: {}",
+            observation.pixel_format
+        )));
+    }
+
+    let expected_bytes = usize::try_from(observation.width)
+        .ok()
+        .and_then(|width| {
+            usize::try_from(observation.height)
+                .ok()
+                .map(|height| (width, height))
+        })
+        .and_then(|(width, height)| width.checked_mul(height))
+        .and_then(|pixels| pixels.checked_mul(4))
+        .ok_or_else(|| CorpusError::new("layer export dimensions overflow"))?;
+    if observation.rgba_bytes != expected_bytes {
+        return Err(CorpusError::new(format!(
+            "layer export RGBA byte length mismatch: expected {expected_bytes}, observed {}",
+            observation.rgba_bytes
+        )));
+    }
+    if observation.rgba_sha256.len() != 64
+        || !observation
+            .rgba_sha256
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit())
+    {
+        return Err(CorpusError::new(
+            "layer export rgba_sha256 must be a 64-character hexadecimal digest",
+        ));
+    }
+
+    Ok(())
+}
+
+pub fn run_layer_export(
+    corpus_path: &Path,
+    fixture_id: &str,
+    layer_name: &str,
+    adapter: &dyn PsdCandidateAdapter,
+) -> Result<LayerExportReport, CorpusError> {
+    let corpus = load_corpus(corpus_path)?;
+    let fixture = benchmark_fixture(&corpus, fixture_id)?;
+    let root = corpus_path.parent().unwrap_or_else(|| Path::new("."));
+    let input = root.join(&fixture.path);
+    let observation = adapter
+        .export_layer(&input, fixture, layer_name)
+        .map_err(|error| {
+            CorpusError::new(format!(
+                "PSD layer export failed for {}: {}",
+                adapter.descriptor().id,
+                error.message
+            ))
+        })?;
+    validate_layer_export_observation(&observation)?;
+    if observation.layer_name != layer_name {
+        return Err(CorpusError::new(format!(
+            "layer export selector drift: requested {layer_name:?}, observed {:?}",
+            observation.layer_name
+        )));
+    }
+
+    Ok(LayerExportReport {
+        schema_version: LAYER_EXPORT_SCHEMA_VERSION.to_owned(),
+        candidate: adapter.descriptor(),
+        fixture_id: fixture.id.clone(),
+        observation,
+    })
+}
+
+fn benchmark_statistics(samples: &[u64]) -> Result<BenchmarkStatistics, CorpusError> {
+    if samples.is_empty() {
+        return Err(CorpusError::new(
+            "PSD benchmark samples must not be empty",
+        ));
+    }
+
+    let mut sorted = samples.to_vec();
+    sorted.sort_unstable();
+    let median_us = if sorted.len() % 2 == 1 {
+        sorted[sorted.len() / 2]
+    } else {
+        let upper = sorted[sorted.len() / 2];
+        let lower = sorted[(sorted.len() / 2) - 1];
+        lower.saturating_add(upper.saturating_sub(lower) / 2)
+    };
+
+    Ok(BenchmarkStatistics {
+        min_us: sorted[0],
+        median_us,
+        max_us: sorted[sorted.len() - 1],
+    })
+}
+
+fn validate_benchmark_observation(
+    config: &BenchmarkConfig,
+    observation: &BenchmarkObservation,
+) -> Result<(), CorpusError> {
+    if observation.measurement != "warm_runtime_operation"
+        || observation.input_read != "once_before_timing"
+        || observation.runtime_startup != "excluded"
+    {
+        return Err(CorpusError::new(
+            "PSD benchmark observation does not match the v1 measurement policy",
+        ));
+    }
+    if observation.warmup_iterations != config.warmup_iterations
+        || observation.sample_iterations != config.sample_iterations
+    {
+        return Err(CorpusError::new(
+            "PSD benchmark observation iteration counts do not match config",
+        ));
+    }
+    let expected_samples = usize::try_from(config.sample_iterations).map_err(|_| {
+        CorpusError::new("PSD benchmark sample_iterations does not fit usize")
+    })?;
+    if observation.inspect_samples_us.len() != expected_samples
+        || observation.layer_export_samples_us.len() != expected_samples
+    {
+        return Err(CorpusError::new(
+            "PSD benchmark observation sample counts do not match config",
+        ));
+    }
+    if observation.layer_export.layer_name != config.layer_name {
+        return Err(CorpusError::new(
+            "PSD benchmark layer export selector does not match config",
+        ));
+    }
+    validate_layer_export_observation(&observation.layer_export)?;
+    Ok(())
+}
+
+pub fn run_benchmark(
+    corpus_path: &Path,
+    config_path: &Path,
+    adapter: &dyn PsdCandidateAdapter,
+) -> Result<CandidateBenchmarkReport, CorpusError> {
+    let corpus = load_corpus(corpus_path)?;
+    let config = load_benchmark_config(config_path)?;
+    validate_benchmark_config(&config, &corpus)?;
+    let fixture = benchmark_fixture(&corpus, &config.fixture_id)?;
+    let root = corpus_path.parent().unwrap_or_else(|| Path::new("."));
+    let input = root.join(&fixture.path);
+    let observation = adapter
+        .benchmark(&input, fixture, &config)
+        .map_err(|error| {
+            CorpusError::new(format!(
+                "PSD benchmark failed for {}: {}",
+                adapter.descriptor().id,
+                error.message
+            ))
+        })?;
+    validate_benchmark_observation(&config, &observation)?;
+
+    Ok(CandidateBenchmarkReport {
+        schema_version: BENCHMARK_SCHEMA_VERSION.to_owned(),
+        candidate: adapter.descriptor(),
+        fixture_id: fixture.id.clone(),
+        layer_name: config.layer_name.clone(),
+        inspect: benchmark_statistics(&observation.inspect_samples_us)?,
+        layer_export: benchmark_statistics(&observation.layer_export_samples_us)?,
+        observation,
+    })
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CandidateReport {
     pub schema_version: String,
