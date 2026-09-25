@@ -416,9 +416,7 @@ impl PsdCandidateAdapter for PsdToolsReferenceAdapter {
         }
 
         serde_json::from_slice::<AdapterObservation>(&output.stdout).map_err(|error| {
-            AdapterError::execution(format!(
-                "invalid psd-tools reference adapter JSON: {error}"
-            ))
+            AdapterError::execution(format!("invalid psd-tools reference adapter JSON: {error}"))
         })
     }
 }
@@ -827,9 +825,8 @@ mod tests {
             .parent()
             .expect("corpus path must have a parent")
             .to_path_buf();
-        let adapter = PsdToolsReferenceAdapter::with_python(
-            "yu-psd-spike-definitely-missing-python-runtime",
-        );
+        let adapter =
+            PsdToolsReferenceAdapter::with_python("yu-psd-spike-definitely-missing-python-runtime");
 
         let error = adapter
             .inspect(&root.join(&fixture.path), fixture)
