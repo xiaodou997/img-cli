@@ -68,7 +68,8 @@ fn run() -> Result<(), String> {
             Ok(())
         }
         [command, suite, output] if command == "benchmark-suite" => {
-            let report = run_benchmark_suite(Path::new(suite)).map_err(|error| error.to_string())?;
+            let report =
+                run_benchmark_suite(Path::new(suite)).map_err(|error| error.to_string())?;
             let json = serde_json::to_string_pretty(&report)
                 .map_err(|error| format!("failed to serialize benchmark suite report: {error}"))?;
             fs::write(output, format!("{json}\n")).map_err(|error| {
