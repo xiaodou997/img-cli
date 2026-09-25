@@ -20,12 +20,14 @@ The matrix evolves as implementation spikes and conformance tests are completed.
 | --- | --- | --- | --- |
 | `runtime.doctor` | Supported | Rust core | Diagnose runtime/engines |
 | `runtime.capabilities` | Supported | Rust core | Effective capabilities |
-| `engine.list` | Supported | Rust core | Built-in/managed/system |
+| `engine.list` | Supported | Engine Manager + Rust core | Unified Built-in/Managed/System inventory |
+| `engine.info` | Supported | Engine Manager + Rust core | All discovered providers for an engine ID |
 | `engine.install` | Supported | Engine Manager | Local manifest; managed engines only |
 | `engine.versions` | Supported | Engine Manager | Installed managed versions |
 | `engine.activate` | Supported | Engine Manager | Explicit active-version switch |
 | `engine.deactivate` | Supported | Engine Manager | Leaves versions installed |
 | `engine.remove` | Supported | Engine Manager | Active/system/built-in removal refused |
+| System version probe | Supported | Engine Manager | ImageMagick, FFmpeg, ExifTool when discovered on PATH |
 
 ## Raster image
 

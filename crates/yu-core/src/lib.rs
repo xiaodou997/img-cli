@@ -161,6 +161,10 @@ pub struct PlatformInfo {
 pub struct EngineSummary {
     pub total: usize,
     pub ready: usize,
+    pub built_in: usize,
+    pub managed: usize,
+    pub system: usize,
+    pub unhealthy: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -233,6 +237,11 @@ impl RuntimeRegistry {
                 engines: vec!["yu-runtime".to_owned()],
             },
             CapabilityDescriptor {
+                id: "engine.info".to_owned(),
+                summary: "Inspect discovered engine providers and versions.".to_owned(),
+                engines: vec!["yu-runtime".to_owned()],
+            },
+            CapabilityDescriptor {
                 id: "engine.install".to_owned(),
                 summary: "Install a managed engine from a manifest.".to_owned(),
                 engines: vec!["yu-runtime".to_owned()],
@@ -280,6 +289,7 @@ impl RuntimeRegistry {
                     "runtime.doctor".to_owned(),
                     "runtime.capabilities".to_owned(),
                     "engine.list".to_owned(),
+                    "engine.info".to_owned(),
                     "engine.install".to_owned(),
                     "engine.versions".to_owned(),
                     "engine.activate".to_owned(),
@@ -363,23 +373,46 @@ impl RuntimeRegistry {
     }
 
     pub fn doctor_report(&self) -> DoctorReport {
-        let ready = self
-            .engines
+        self.doctor_report_with_engines(&self.engines)
+    }
+
+    pub fn doctor_report_with_engines(&self, engines: &[EngineDescriptor]) -> DoctorReport {
+        let ready = engines
             .iter()
             .filter(|engine| engine.state == EngineState::Ready)
+            .count();
+        let built_in = engines
+            .iter()
+            .filter(|engine| engine.provider == EngineProvider::BuiltIn)
+            .count();
+        let managed = engines
+            .iter()
+            .filter(|engine| engine.provider == EngineProvider::Managed)
+            .count();
+        let system = engines
+            .iter()
+            .filter(|engine| engine.provider == EngineProvider::System)
+            .count();
+        let unhealthy = engines
+            .iter()
+            .filter(|engine| engine_is_unhealthy(engine))
             .count();
 
         DoctorReport {
             version: env!("CARGO_PKG_VERSION").to_owned(),
-            healthy: ready == self.engines.len(),
+            healthy: unhealthy == 0,
             platform: PlatformInfo {
                 os: std::env::consts::OS.to_owned(),
                 arch: std::env::consts::ARCH.to_owned(),
             },
             capabilities: self.capabilities.len(),
             engines: EngineSummary {
-                total: self.engines.len(),
+                total: engines.len(),
                 ready,
+                built_in,
+                managed,
+                system,
+                unhealthy,
             },
         }
     }
@@ -388,6 +421,14 @@ impl RuntimeRegistry {
 impl Default for RuntimeRegistry {
     fn default() -> Self {
         Self::bootstrap()
+    }
+}
+
+fn engine_is_unhealthy(engine: &EngineDescriptor) -> bool {
+    match engine.state {
+        EngineState::Ready | EngineState::Disabled => false,
+        EngineState::NotInstalled => engine.provider != EngineProvider::System,
+        EngineState::Broken | EngineState::Incompatible => true,
     }
 }
 
@@ -411,6 +452,10 @@ mod tests {
         assert!(report.healthy);
         assert_eq!(report.engines.total, 2);
         assert_eq!(report.engines.ready, 2);
+        assert_eq!(report.engines.built_in, 2);
+        assert_eq!(report.engines.managed, 0);
+        assert_eq!(report.engines.system, 0);
+        assert_eq!(report.engines.unhealthy, 0);
     }
 
     #[test]
@@ -428,6 +473,7 @@ mod tests {
                 "runtime.doctor",
                 "runtime.capabilities",
                 "engine.list",
+                "engine.info",
                 "engine.install",
                 "engine.versions",
                 "engine.activate",

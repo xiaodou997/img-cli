@@ -85,6 +85,10 @@ Progress:
 - [x] inter-process engine mutation lock;
 - [x] public managed-engine CLI;
 - [x] system executable discovery foundation;
+- [x] system engine version probing (ImageMagick / FFmpeg / ExifTool);
+- [x] unified Built-in / Managed / System inventory;
+- [x] `yu engine info`;
+- [x] `yu doctor` unified inventory integration;
 - [x] managed engine state diagnostics.
 
 CLI target:

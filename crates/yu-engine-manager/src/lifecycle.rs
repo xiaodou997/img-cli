@@ -19,6 +19,10 @@ pub struct InstalledEngineMetadata {
     pub schema_version: String,
     pub engine_id: String,
     pub version: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub capabilities: Vec<String>,
     pub target: EngineTarget,
     pub entrypoint: String,
     pub sha256: String,
@@ -441,6 +445,8 @@ pub(crate) fn write_install_metadata(
         schema_version: LIFECYCLE_SCHEMA_VERSION.to_owned(),
         engine_id: manifest.id.clone(),
         version: manifest.version.clone(),
+        display_name: Some(manifest.display_name.clone()),
+        capabilities: manifest.capabilities.clone(),
         target: package.target.clone(),
         entrypoint: package.entrypoint.clone(),
         sha256: sha256.to_owned(),

@@ -55,13 +55,18 @@ fn create_png(path: &Path, width: u32, height: u32) {
 
 #[test]
 fn doctor_json_is_machine_readable() {
-    let output = run(&["doctor", "--json"]);
+    let root = temp_path("doctor-data", "dir");
+    fs::create_dir_all(&root).unwrap();
+    let output = run_with_data_home(&["doctor", "--json"], &root);
     let json = parse_stdout(&output);
 
     assert_eq!(json["schema_version"], "1");
     assert_eq!(json["operation"], "runtime.doctor");
-    assert_eq!(json["result"]["healthy"], true);
-    assert_eq!(json["result"]["engines"]["ready"], 2);
+    assert!(json["result"]["engines"]["total"].as_u64().unwrap() >= 2);
+    assert!(json["result"]["engines"]["ready"].as_u64().unwrap() >= 2);
+    assert_eq!(json["result"]["engines"]["built_in"], 2);
+
+    let _ = fs::remove_dir_all(root);
 }
 
 #[test]
@@ -83,6 +88,7 @@ fn capabilities_json_contains_runtime_and_image_capabilities() {
             .any(|item| item["id"] == "runtime.capabilities")
     );
     assert!(capabilities.iter().any(|item| item["id"] == "engine.list"));
+    assert!(capabilities.iter().any(|item| item["id"] == "engine.info"));
     assert!(capabilities.iter().any(|item| item["id"] == "image.info"));
     assert!(capabilities.iter().any(|item| item["id"] == "image.resize"));
 }
@@ -95,7 +101,7 @@ fn engine_list_json_contains_built_in_runtime_and_raster_engine() {
         .as_array()
         .expect("result should be an array");
 
-    assert_eq!(engines.len(), 2);
+    assert!(engines.len() >= 2);
     assert!(
         engines
             .iter()
@@ -106,6 +112,34 @@ fn engine_list_json_contains_built_in_runtime_and_raster_engine() {
             .iter()
             .any(|engine| engine["id"] == "raster-rs" && engine["provider"] == "built_in")
     );
+}
+
+#[test]
+fn engine_info_json_reports_built_in_provider() {
+    let output = run(&["engine", "info", "raster-rs", "--json"]);
+    let json = parse_stdout(&output);
+    let entries = json["result"]
+        .as_array()
+        .expect("engine.info result should be an array");
+
+    assert_eq!(json["operation"], "engine.info");
+    assert!(
+        entries
+            .iter()
+            .any(|engine| engine["id"] == "raster-rs"
+                && engine["provider"] == "built_in"
+                && engine["state"] == "ready")
+    );
+}
+
+#[test]
+fn engine_info_unknown_returns_engine_unavailable() {
+    let output = run(&["engine", "info", "does-not-exist", "--json"]);
+
+    assert_eq!(output.status.code(), Some(3));
+    let json: Value =
+        serde_json::from_slice(&output.stderr).expect("stderr should be structured JSON");
+    assert_eq!(json["error"]["code"], "ENGINE_UNAVAILABLE");
 }
 
 #[test]
@@ -259,6 +293,19 @@ fn engine_versions_activate_deactivate_remove_round_trip() {
     install_fixture_engine(&root, "1.0.0");
     install_fixture_engine(&root, "2.0.0");
 
+    let output = run_with_data_home(&["engine", "list", "--json"], &root);
+    let json = parse_stdout(&output);
+    let managed = json["result"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|engine| {
+            engine["id"] == "fixture-engine" && engine["provider"] == "managed"
+        })
+        .expect("managed fixture should be discovered");
+    assert_eq!(managed["state"], "disabled");
+    assert_eq!(managed["installed_versions"].as_array().unwrap().len(), 2);
+
     let output = run_with_data_home(&["engine", "versions", "fixture-engine", "--json"], &root);
     let json = parse_stdout(&output);
     assert_eq!(json["operation"], "engine.versions");
@@ -271,6 +318,19 @@ fn engine_versions_activate_deactivate_remove_round_trip() {
     let json = parse_stdout(&output);
     assert_eq!(json["operation"], "engine.activate");
     assert_eq!(json["result"]["active_version"], "2.0.0");
+
+    let output = run_with_data_home(&["engine", "info", "fixture-engine", "--json"], &root);
+    let json = parse_stdout(&output);
+    let managed = json["result"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|engine| engine["provider"] == "managed")
+        .expect("managed fixture info should be discovered");
+    assert_eq!(managed["state"], "ready");
+    assert_eq!(managed["active_version"], "2.0.0");
+    assert_eq!(managed["display_name"], "Fixture Engine");
+    assert_eq!(managed["capabilities"][0], "fixture.run");
 
     let output = run_with_data_home(
         &["engine", "remove", "fixture-engine", "2.0.0", "--json"],
