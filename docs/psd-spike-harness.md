@@ -166,6 +166,29 @@ For bitmap masks, an ag-psd `mask` or `realMask` whose `fromVectorData` flag is 
 
 The adapter refuses a different Node major version or ag-psd package version so comparison runs cannot silently drift.
 
+The first corpus-v1 run establishes this ag-psd baseline:
+
+| Fixture | ag-psd 31.0.2 |
+| --- | --- |
+| `simple-pixel-layers-psd` | pass |
+| `simple-pixel-layers-psb` | pass |
+| `nested-group` | pass |
+| `duplicate-layer-names` | pass |
+| `text-layer` | pass |
+| `layer-masks` | pass |
+| `malformed-truncated-header` | pass |
+
+Summary:
+
+```text
+passed:  7
+failed:  0
+skipped: 0
+errors:  0
+```
+
+This 7/7 baseline is asserted by the spike test. The current ag-psd README still contains an outdated PSB limitation line, but the library code and changelog include Large Document support and the committed PSB fixture passes the pinned 31.0.2 candidate.
+
 ### psd-tools reference runtime
 
 The reference environment is intentionally pinned:
