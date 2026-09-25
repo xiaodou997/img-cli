@@ -136,6 +136,7 @@ Progress:
 - [x] psd-tools 1.20.0 reference candidate integration (Python 3.12);
 - [x] TypeScript/Node candidate integration (ag-psd 31.0.2);
 - [x] candidate comparison report v1 (conformance, distribution, maintenance evidence);
+- [x] performance / layer-export benchmark harness v1;
 - [ ] controlled performance/memory benchmark report;
 - [ ] PSD engine strategy decision.
 
