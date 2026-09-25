@@ -2,6 +2,173 @@
   "schema_version": "1",
   "fixtures": [
     {
+      "id": "simple-pixel-layers-psd",
+      "path": "upstream/psd-tools/2layers.psd",
+      "format": "psd",
+      "features": [
+        "simple_pixel_layers"
+      ],
+      "expected": {
+        "parse": "accept",
+        "width": 101,
+        "height": 55,
+        "layer_count": 2,
+        "minimum_tree_depth": 1,
+        "layer_names": [
+          "Фон",
+          "Слой"
+        ]
+      },
+      "provenance": {
+        "kind": "redistributable",
+        "source": "psd-tools test fixture",
+        "license": "MIT",
+        "redistributable": true,
+        "upstream_commit": "f1256273ffb9b39b9efa19d486c86f594c831f42",
+        "upstream_path": "tests/psd_files/2layers.psd"
+      }
+    },
+    {
+      "id": "simple-pixel-layers-psb",
+      "path": "upstream/psd-tools/2layers.psb",
+      "format": "psb",
+      "features": [
+        "simple_pixel_layers"
+      ],
+      "expected": {
+        "parse": "accept",
+        "width": 101,
+        "height": 55,
+        "layer_count": 2,
+        "minimum_tree_depth": 1,
+        "layer_names": [
+          "Фон",
+          "Слой"
+        ]
+      },
+      "provenance": {
+        "kind": "redistributable",
+        "source": "psd-tools test fixture",
+        "license": "MIT",
+        "redistributable": true,
+        "upstream_commit": "f1256273ffb9b39b9efa19d486c86f594c831f42",
+        "upstream_path": "tests/psd_files/2layers.psb"
+      }
+    },
+    {
+      "id": "nested-group",
+      "path": "upstream/psd-tools/group.psd",
+      "format": "psd",
+      "features": [
+        "nested_groups"
+      ],
+      "expected": {
+        "parse": "accept",
+        "width": 100,
+        "height": 200,
+        "layer_count": 3,
+        "minimum_tree_depth": 2,
+        "layer_names": [
+          "Background",
+          "Shape 1",
+          "Group 1"
+        ]
+      },
+      "provenance": {
+        "kind": "redistributable",
+        "source": "psd-tools test fixture",
+        "license": "MIT",
+        "redistributable": true,
+        "upstream_commit": "f1256273ffb9b39b9efa19d486c86f594c831f42",
+        "upstream_path": "tests/psd_files/group.psd"
+      }
+    },
+    {
+      "id": "duplicate-layer-names",
+      "path": "derived/duplicate-layer-names.psd",
+      "format": "psd",
+      "features": [
+        "duplicate_layer_names",
+        "simple_pixel_layers"
+      ],
+      "expected": {
+        "parse": "accept",
+        "width": 101,
+        "height": 55,
+        "layer_count": 2,
+        "minimum_tree_depth": 1,
+        "layer_names": [
+          "X",
+          "X"
+        ]
+      },
+      "provenance": {
+        "kind": "redistributable",
+        "source": "YuTool derivative of psd-tools 2layers.psd; Pascal and Unicode layer names normalized to X",
+        "license": "MIT",
+        "redistributable": true,
+        "upstream_commit": "f1256273ffb9b39b9efa19d486c86f594c831f42",
+        "upstream_path": "tests/psd_files/2layers.psd"
+      }
+    },
+    {
+      "id": "text-layer",
+      "path": "upstream/psd-tools/type-layer.psd",
+      "format": "psd",
+      "features": [
+        "text_layers"
+      ],
+      "expected": {
+        "parse": "accept",
+        "width": 32,
+        "height": 32,
+        "layer_count": 1,
+        "minimum_tree_depth": 1,
+        "layer_names": [
+          "A"
+        ],
+        "text_layer_count": 1
+      },
+      "provenance": {
+        "kind": "redistributable",
+        "source": "psd-tools minimal type-layer test fixture",
+        "license": "MIT",
+        "redistributable": true,
+        "upstream_commit": "f1256273ffb9b39b9efa19d486c86f594c831f42",
+        "upstream_path": "tests/psd_files/layers-minimal/type-layer.psd"
+      }
+    },
+    {
+      "id": "layer-masks",
+      "path": "upstream/psd-tools/masks-2.psd",
+      "format": "psd",
+      "features": [
+        "masks"
+      ],
+      "expected": {
+        "parse": "accept",
+        "width": 64,
+        "height": 64,
+        "layer_count": 3,
+        "minimum_tree_depth": 1,
+        "layer_names": [
+          "ellipse1",
+          "ellipse2",
+          "ellipse3"
+        ],
+        "pixel_mask_layer_count": 2,
+        "vector_mask_layer_count": 3
+      },
+      "provenance": {
+        "kind": "redistributable",
+        "source": "psd-tools mask test fixture",
+        "license": "MIT",
+        "redistributable": true,
+        "upstream_commit": "f1256273ffb9b39b9efa19d486c86f594c831f42",
+        "upstream_path": "tests/psd_files/masks/2.psd"
+      }
+    },
+    {
       "id": "malformed-truncated-header",
       "path": "malformed/truncated-header.psd",
       "format": "psd",
