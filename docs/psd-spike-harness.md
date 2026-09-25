@@ -80,15 +80,15 @@ The contract can be extended as the corpus starts testing masks, text, Smart Obj
 
 ## Candidate status
 
-PR #10 registered three candidate slots. PR #12 wired the psd-tools reference; PR #13 wires the first Rust-native candidate:
+PR #10 registered three candidate slots. PR #12 wired the psd-tools reference, PR #13 wired rawpsd, and PR #14 wires ag-psd:
 
 | Candidate ID | Runtime family | Current behavior |
 | --- | --- | --- |
 | `rust-native` | Rust | rawpsd 0.2.2 candidate |
 | `psd-tools` | Python | wired reference adapter |
-| `typescript-psd` | TypeScript/Node | skeleton / unavailable |
+| `typescript-psd` | TypeScript/Node | ag-psd 31.0.2 candidate |
 
-A skeleton returns an explicit `unavailable` result. A wired candidate is evidence for comparison, not a default-engine selection.
+All three M3 candidate slots are now wired. A wired candidate is evidence for comparison, not a default-engine selection.
 
 ### rawpsd Rust-native candidate
 
@@ -139,6 +139,55 @@ errors:  0
 ```
 
 This baseline is intentionally asserted by the spike tests so future rawpsd upgrades cannot silently change the comparison result.
+
+### ag-psd TypeScript/Node candidate
+
+PR #14 pins:
+
+```text
+Node.js 22
+ag-psd 31.0.2
+```
+
+The published ag-psd package is installed only inside `crates/yu-psd-spike/adapters/typescript/` by the dedicated PSD Spike workflow. Normal YuTool runtime and normal Rust CI do not install Node modules.
+
+The adapter runs `adapters/typescript/ag_psd_candidate.cjs` through argv without shell interpolation and normalizes ag-psd's document tree into:
+
+- parse success/rejection;
+- width and height;
+- logical layer count;
+- maximum tree depth;
+- layer names;
+- text-layer count;
+- bitmap-mask layer count;
+- vector-mask layer count.
+
+For bitmap masks, an ag-psd `mask` or `realMask` whose `fromVectorData` flag is not true counts as a bitmap mask. A `vectorMask` counts independently.
+
+The adapter refuses a different Node major version or ag-psd package version so comparison runs cannot silently drift.
+
+The first corpus-v1 run establishes this ag-psd baseline:
+
+| Fixture | ag-psd 31.0.2 |
+| --- | --- |
+| `simple-pixel-layers-psd` | pass |
+| `simple-pixel-layers-psb` | pass |
+| `nested-group` | pass |
+| `duplicate-layer-names` | pass |
+| `text-layer` | pass |
+| `layer-masks` | pass |
+| `malformed-truncated-header` | pass |
+
+Summary:
+
+```text
+passed:  7
+failed:  0
+skipped: 0
+errors:  0
+```
+
+This 7/7 baseline is asserted by the spike test. The current ag-psd README still contains an outdated PSB limitation line, but the library code and changelog include Large Document support and the committed PSB fixture passes the pinned 31.0.2 candidate.
 
 ### psd-tools reference runtime
 
@@ -196,7 +245,14 @@ For `rust-native`, the command runs rawpsd directly in-process:
 cargo run -p yu-psd-spike -- run rust-native fixtures/psd/corpus.json
 ```
 
-TypeScript remains the only skeleton candidate.
+For `typescript-psd`, install the pinned adapter package first and run:
+
+```bash
+npm install --prefix crates/yu-psd-spike/adapters/typescript --ignore-scripts --no-audit --no-fund
+cargo run -p yu-psd-spike -- run typescript-psd fixtures/psd/corpus.json
+```
+
+Set `YU_TYPESCRIPT_PSD_NODE` when an explicit Node executable is required.
 
 ## CI contract
 
@@ -209,11 +265,11 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
-PR #12 adds a separate three-platform `PSD Spike` gate for Python 3.12 + psd-tools 1.20.0. PR #13 adds a second three-platform job that runs the rawpsd candidate against the same corpus and prints its normalized report.
+PR #12 adds the three-platform psd-tools reference gate. PR #13 adds the rawpsd candidate gate. PR #14 adds a third Ubuntu/macOS/Windows job for Node.js 22 + ag-psd 31.0.2.
 
-The rawpsd job requires the adapter to complete without harness errors; it does not require every fixture to pass, because unsupported capabilities are evidence for the M3 comparison.
+Candidate jobs require adapter execution without harness errors. A candidate is not required to reach 7/7 unless its observed capability actually matches the corpus.
 
-Normal tests cover corpus validation, expected comparison semantics, path traversal rejection, the remaining TypeScript skeleton, graceful `unavailable` behavior for the reference Python runtime, and rawpsd candidate execution.
+Normal tests cover corpus validation, expected comparison semantics, path traversal rejection, all three wired descriptors, graceful `unavailable` behavior for missing external runtimes, and rawpsd candidate execution.
 
 ## Follow-up direction
 

@@ -1,0 +1,8 @@
+{
+  "name": "yu-psd-spike-typescript-adapter",
+  "private": true,
+  "version": "0.0.0",
+  "dependencies": {
+    "ag-psd": "31.0.2"
+  }
+}
