@@ -454,7 +454,12 @@ fn compare_observation(fixture: &PsdFixture, observation: &AdapterObservation) -
     }
 
     let mut issues = Vec::new();
-    compare_optional("width", fixture.expected.width, observation.width, &mut issues);
+    compare_optional(
+        "width",
+        fixture.expected.width,
+        observation.width,
+        &mut issues,
+    );
     compare_optional(
         "height",
         fixture.expected.height,
@@ -555,7 +560,8 @@ mod tests {
 
     #[test]
     fn committed_corpus_is_valid() {
-        let corpus = load_corpus(&committed_corpus_path()).expect("committed corpus should be valid");
+        let corpus =
+            load_corpus(&committed_corpus_path()).expect("committed corpus should be valid");
         assert_eq!(corpus.schema_version, CORPUS_SCHEMA_VERSION);
         assert_eq!(corpus.fixtures.len(), 1);
     }
