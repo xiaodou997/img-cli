@@ -887,8 +887,7 @@ mod tests {
     }
 
     fn representative_suite_path() -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../docs/data/psd-benchmark-suite-v2.json")
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/data/psd-benchmark-suite-v2.json")
     }
 
     #[test]
