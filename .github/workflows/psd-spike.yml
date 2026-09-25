@@ -36,3 +36,20 @@ jobs:
         env:
           YU_PSD_TOOLS_PYTHON: python
         run: cargo test -p yu-psd-spike psd_tools_reference_matches_committed_corpus -- --ignored --nocapture
+
+
+  rawpsd-candidate:
+    name: rawpsd candidate / ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Run rawpsd candidate corpus report
+        run: cargo test -p yu-psd-spike rawpsd_candidate_runs_committed_corpus_without_harness_errors -- --nocapture
