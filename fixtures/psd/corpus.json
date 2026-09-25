@@ -1,0 +1,22 @@
+{
+  "schema_version": "1",
+  "fixtures": [
+    {
+      "id": "malformed-truncated-header",
+      "path": "malformed/truncated-header.psd",
+      "format": "psd",
+      "features": [
+        "malformed"
+      ],
+      "expected": {
+        "parse": "reject"
+      },
+      "provenance": {
+        "kind": "synthetic",
+        "source": "YuTool M3 spike corpus: deliberately truncated PSD signature",
+        "license": null,
+        "redistributable": true
+      }
+    }
+  ]
+}
