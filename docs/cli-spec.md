@@ -23,12 +23,16 @@ This document defines the intended public command model. Commands marked **plann
 
 ### `yu doctor`
 
-Diagnose YuTool and engine health.
+Diagnose YuTool and the unified engine inventory.
 
 ```bash
 yu doctor
 yu doctor --json
 ```
+
+Doctor counts Built-in, Managed, and discovered System engines from the same inventory used by `yu engine list`.
+
+A healthy but inactive Managed engine is reported as `disabled` and does not make Doctor degraded. Missing optional System tools are not included at all. Broken/incompatible discovered engines contribute warnings and degrade health.
 
 ### `yu capabilities`
 
@@ -43,12 +47,36 @@ This reports **effective capabilities on the current machine**, not merely featu
 
 ### `yu engine list`
 
-List engines and their state.
+List the unified engine inventory across Built-in, Managed, and discovered System providers.
 
 ```bash
 yu engine list
 yu engine list --json
 ```
+
+The JSON result preserves the existing descriptor fields:
+
+- `id`
+- `display_name`
+- `provider`
+- `state`
+- `version`
+- `capabilities`
+
+and may add optional discovery fields such as `executable`, `installed_versions`, `active_version`, and `warnings`.
+
+System engines are listed only when their executable is actually discovered on `PATH`.
+
+### `yu engine info`
+
+Inspect every discovered provider for one logical engine ID.
+
+```bash
+yu engine info imagemagick
+yu engine info imagemagick --json
+```
+
+If both a YuTool-managed ImageMagick and a system ImageMagick exist, both provider records are returned rather than silently replacing one with the other.
 
 States include:
 

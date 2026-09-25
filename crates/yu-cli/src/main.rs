@@ -12,7 +12,8 @@ use yu_core::{
 };
 use yu_engine_image_rs::{ENGINE_ID as RASTER_ENGINE_ID, RustImageEngine};
 use yu_engine_manager::{
-    EngineInstaller, EngineManager, EngineManifest, HttpDownloader, ManagerError,
+    EngineInstaller, EngineInventoryEntry, EngineManager, EngineManifest, HttpDownloader,
+    ManagerError,
 };
 
 #[derive(Debug, Parser)]
@@ -49,8 +50,10 @@ enum Command {
 
 #[derive(Debug, Subcommand)]
 enum EngineCommand {
-    /// List known built-in engines and their current state.
+    /// List discovered built-in, managed, and system engines.
     List,
+    /// Inspect all discovered providers for an engine ID.
+    Info { engine: String },
     /// Install a managed engine from a local manifest.
     Install {
         #[arg(long)]
@@ -110,20 +113,17 @@ fn run(cli: Cli) -> Result<(), YuError> {
     let registry = RuntimeRegistry::bootstrap();
 
     match cli.command {
-        Command::Doctor => {
-            render_doctor(&registry, cli.json);
-            Ok(())
-        }
+        Command::Doctor => render_doctor(&registry, cli.json),
         Command::Capabilities => {
             render_capabilities(&registry, cli.json);
             Ok(())
         }
         Command::Engine {
             command: EngineCommand::List,
-        } => {
-            render_engines(&registry, cli.json);
-            Ok(())
-        }
+        } => render_engines(&registry, cli.json),
+        Command::Engine {
+            command: EngineCommand::Info { engine },
+        } => render_engine_info(&registry, &engine, cli.json),
         Command::Engine {
             command: EngineCommand::Install { manifest },
         } => render_engine_install(&manifest, cli.json),
@@ -165,12 +165,22 @@ fn run(cli: Cli) -> Result<(), YuError> {
     }
 }
 
-fn render_doctor(registry: &RuntimeRegistry, json: bool) {
-    let report = registry.doctor_report();
+fn render_doctor(registry: &RuntimeRegistry, json: bool) -> Result<(), YuError> {
+    let inventory = discover_inventory(registry)?;
+    let descriptors = inventory
+        .iter()
+        .map(EngineInventoryEntry::descriptor)
+        .collect::<Vec<_>>();
+    let report = registry.doctor_report_with_engines(&descriptors);
+    let warnings = inventory_warnings(&inventory);
 
     if json {
-        print_json(&ResultEnvelope::new("runtime.doctor", report));
-        return;
+        let mut envelope = ResultEnvelope::new("runtime.doctor", report);
+        for warning in warnings {
+            envelope = envelope.with_warning(warning);
+        }
+        print_json(&envelope);
+        return Ok(());
     }
 
     println!("YuTool {}", report.version);
@@ -185,9 +195,19 @@ fn render_doctor(registry: &RuntimeRegistry, json: bool) {
     println!("Platform: {}/{}", report.platform.os, report.platform.arch);
     println!("Capabilities: {}", report.capabilities);
     println!(
-        "Engines: {} total, {} ready",
-        report.engines.total, report.engines.ready
+        "Engines: {} total, {} ready ({} built-in / {} managed / {} system)",
+        report.engines.total,
+        report.engines.ready,
+        report.engines.built_in,
+        report.engines.managed,
+        report.engines.system
     );
+
+    for warning in warnings {
+        eprintln!("warning: {warning}");
+    }
+
+    Ok(())
 }
 
 fn render_capabilities(registry: &RuntimeRegistry, json: bool) {
@@ -210,26 +230,121 @@ fn render_capabilities(registry: &RuntimeRegistry, json: bool) {
     }
 }
 
-fn render_engines(registry: &RuntimeRegistry, json: bool) {
+fn render_engines(registry: &RuntimeRegistry, json: bool) -> Result<(), YuError> {
+    let inventory = discover_inventory(registry)?;
+
     if json {
-        print_json(&ResultEnvelope::new("engine.list", registry.engines()));
-        return;
+        print_json(&ResultEnvelope::new("engine.list", inventory));
+        return Ok(());
     }
 
     println!(
-        "{:<16} {:<12} {:<14} {:<10} CAPABILITIES",
-        "ENGINE", "PROVIDER", "STATE", "VERSION"
+        "{:<16} {:<10} {:<12} {:<16} {:<16} EXECUTABLE",
+        "ENGINE", "PROVIDER", "STATE", "VERSION", "ACTIVE"
     );
-    for engine in registry.engines() {
+    for engine in inventory {
         println!(
-            "{:<16} {:<12} {:<14} {:<10} {}",
+            "{:<16} {:<10} {:<12} {:<16} {:<16} {}",
             engine.id,
             engine.provider,
             engine.state,
             engine.version.as_deref().unwrap_or("-"),
-            engine.capabilities.len()
+            engine.active_version.as_deref().unwrap_or("-"),
+            engine
+                .executable
+                .as_ref()
+                .map(|path| path.display().to_string())
+                .unwrap_or_else(|| "-".to_owned())
         );
     }
+
+    Ok(())
+}
+
+fn render_engine_info(
+    registry: &RuntimeRegistry,
+    engine_id: &str,
+    json: bool,
+) -> Result<(), YuError> {
+    let matches = discover_inventory(registry)?
+        .into_iter()
+        .filter(|engine| engine.id == engine_id)
+        .collect::<Vec<_>>();
+
+    if matches.is_empty() {
+        return Err(YuError::new(
+            ErrorCode::EngineUnavailable,
+            format!("engine is not discovered: {engine_id}"),
+        ));
+    }
+
+    if json {
+        print_json(&ResultEnvelope::new("engine.info", matches));
+        return Ok(());
+    }
+
+    for (index, engine) in matches.iter().enumerate() {
+        if index > 0 {
+            println!();
+        }
+        println!("Engine: {}", engine.id);
+        println!("Name: {}", engine.display_name);
+        println!("Provider: {}", engine.provider);
+        println!("State: {}", engine.state);
+        println!("Version: {}", engine.version.as_deref().unwrap_or("-"));
+        println!(
+            "Active version: {}",
+            engine.active_version.as_deref().unwrap_or("-")
+        );
+        println!(
+            "Installed versions: {}",
+            if engine.installed_versions.is_empty() {
+                "-".to_owned()
+            } else {
+                engine.installed_versions.join(", ")
+            }
+        );
+        println!(
+            "Executable: {}",
+            engine
+                .executable
+                .as_ref()
+                .map(|path| path.display().to_string())
+                .unwrap_or_else(|| "-".to_owned())
+        );
+        println!(
+            "Capabilities: {}",
+            if engine.capabilities.is_empty() {
+                "-".to_owned()
+            } else {
+                engine.capabilities.join(", ")
+            }
+        );
+        for warning in &engine.warnings {
+            println!("Warning: {warning}");
+        }
+    }
+
+    Ok(())
+}
+
+fn discover_inventory(registry: &RuntimeRegistry) -> Result<Vec<EngineInventoryEntry>, YuError> {
+    let manager = EngineManager::discover().map_err(map_manager_error)?;
+    manager
+        .discover_inventory(registry.engines())
+        .map_err(map_manager_error)
+}
+
+fn inventory_warnings(inventory: &[EngineInventoryEntry]) -> Vec<String> {
+    inventory
+        .iter()
+        .flat_map(|engine| {
+            engine
+                .warnings
+                .iter()
+                .map(|warning| format!("{} [{}]: {warning}", engine.id, engine.provider))
+        })
+        .collect()
 }
 
 fn render_engine_install(manifest_path: &Path, json: bool) -> Result<(), YuError> {
@@ -378,6 +493,7 @@ fn map_manager_error(error: ManagerError) -> YuError {
         | ManagerError::Busy(_) => ErrorCode::OutputConflict,
         ManagerError::Integrity(_) => ErrorCode::VerificationFailed,
         ManagerError::Download(_)
+        | ManagerError::Probe(_)
         | ManagerError::State(_)
         | ManagerError::Environment(_)
         | ManagerError::Io(_) => ErrorCode::ExecutionFailed,
