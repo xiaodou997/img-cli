@@ -66,6 +66,14 @@ pub struct FixtureExpectation {
     pub layer_count: Option<usize>,
     #[serde(default)]
     pub minimum_tree_depth: Option<usize>,
+    #[serde(default)]
+    pub layer_names: Option<Vec<String>>,
+    #[serde(default)]
+    pub text_layer_count: Option<usize>,
+    #[serde(default)]
+    pub pixel_mask_layer_count: Option<usize>,
+    #[serde(default)]
+    pub vector_mask_layer_count: Option<usize>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -82,6 +90,10 @@ pub struct FixtureProvenance {
     #[serde(default)]
     pub license: Option<String>,
     pub redistributable: bool,
+    #[serde(default)]
+    pub upstream_commit: Option<String>,
+    #[serde(default)]
+    pub upstream_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -236,6 +248,14 @@ pub struct AdapterObservation {
     pub layer_count: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub maximum_tree_depth: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub layer_names: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text_layer_count: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pixel_mask_layer_count: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vector_mask_layer_count: Option<usize>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -472,10 +492,33 @@ fn compare_observation(fixture: &PsdFixture, observation: &AdapterObservation) -
         observation.layer_count,
         &mut issues,
     );
-    compare_optional(
+    compare_minimum_optional(
         "minimum_tree_depth",
         fixture.expected.minimum_tree_depth,
         observation.maximum_tree_depth,
+        &mut issues,
+    );
+    compare_layer_names(
+        fixture.expected.layer_names.as_deref(),
+        observation.layer_names.as_deref(),
+        &mut issues,
+    );
+    compare_optional(
+        "text_layer_count",
+        fixture.expected.text_layer_count,
+        observation.text_layer_count,
+        &mut issues,
+    );
+    compare_optional(
+        "pixel_mask_layer_count",
+        fixture.expected.pixel_mask_layer_count,
+        observation.pixel_mask_layer_count,
+        &mut issues,
+    );
+    compare_optional(
+        "vector_mask_layer_count",
+        fixture.expected.vector_mask_layer_count,
+        observation.vector_mask_layer_count,
         &mut issues,
     );
 
@@ -511,6 +554,52 @@ fn compare_optional<T>(
     }
 }
 
+fn compare_minimum_optional(
+    field: &str,
+    expected_minimum: Option<usize>,
+    observed: Option<usize>,
+    issues: &mut Vec<String>,
+) {
+    let Some(expected_minimum) = expected_minimum else {
+        return;
+    };
+    match observed {
+        Some(observed) if observed >= expected_minimum => {}
+        Some(observed) => issues.push(format!(
+            "{field} below minimum: expected at least {expected_minimum}, observed {observed}"
+        )),
+        None => issues.push(format!(
+            "{field} missing: expected at least {expected_minimum}"
+        )),
+    }
+}
+
+fn compare_layer_names(
+    expected: Option<&[String]>,
+    observed: Option<&[String]>,
+    issues: &mut Vec<String>,
+) {
+    let Some(expected) = expected else {
+        return;
+    };
+    let Some(observed) = observed else {
+        issues.push("layer_names missing".to_owned());
+        return;
+    };
+
+    let mut expected = expected.to_vec();
+    let mut observed = observed.to_vec();
+    expected.sort();
+    observed.sort();
+
+    if expected != observed {
+        issues.push(format!(
+            "layer_names mismatch: expected {:?}, observed {:?}",
+            expected, observed
+        ));
+    }
+}
+
 fn summarize(fixtures: &[FixtureReport]) -> ReportSummary {
     let mut summary = ReportSummary::default();
     for fixture in fixtures {
@@ -533,27 +622,34 @@ mod tests {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/psd/corpus.json")
     }
 
-    struct RejectingAdapter;
+    struct ExpectedObservationAdapter;
 
-    impl PsdCandidateAdapter for RejectingAdapter {
+    impl PsdCandidateAdapter for ExpectedObservationAdapter {
         fn descriptor(&self) -> CandidateDescriptor {
             CandidateDescriptor {
-                id: "test-rejecting".to_owned(),
-                display_name: "Test rejecting adapter".to_owned(),
+                id: "test-expected-observation".to_owned(),
+                display_name: "Test expected-observation adapter".to_owned(),
                 runtime: CandidateRuntime::RustNative,
                 status: CandidateStatus::Wired,
-                notes: "Test-only adapter.".to_owned(),
+                notes: "Test-only adapter that mirrors fixture expectations.".to_owned(),
             }
         }
 
         fn inspect(
             &self,
             _input: &Path,
-            _fixture: &PsdFixture,
+            fixture: &PsdFixture,
         ) -> Result<AdapterObservation, AdapterError> {
             Ok(AdapterObservation {
-                parse_success: false,
-                ..AdapterObservation::default()
+                parse_success: matches!(fixture.expected.parse, ParseExpectation::Accept),
+                width: fixture.expected.width,
+                height: fixture.expected.height,
+                layer_count: fixture.expected.layer_count,
+                maximum_tree_depth: fixture.expected.minimum_tree_depth,
+                layer_names: fixture.expected.layer_names.clone(),
+                text_layer_count: fixture.expected.text_layer_count,
+                pixel_mask_layer_count: fixture.expected.pixel_mask_layer_count,
+                vector_mask_layer_count: fixture.expected.vector_mask_layer_count,
             })
         }
     }
@@ -563,16 +659,45 @@ mod tests {
         let corpus =
             load_corpus(&committed_corpus_path()).expect("committed corpus should be valid");
         assert_eq!(corpus.schema_version, CORPUS_SCHEMA_VERSION);
-        assert_eq!(corpus.fixtures.len(), 1);
+        assert_eq!(corpus.fixtures.len(), 7);
     }
 
     #[test]
-    fn expected_reject_is_a_passing_conformance_result() {
-        let report = run_candidate(&committed_corpus_path(), &RejectingAdapter)
+    fn committed_expectations_can_be_compared() {
+        let report = run_candidate(&committed_corpus_path(), &ExpectedObservationAdapter)
             .expect("test adapter should run");
-        assert_eq!(report.summary.passed, 1);
+        assert_eq!(report.summary.passed, 7);
         assert_eq!(report.summary.failed, 0);
+        assert_eq!(report.summary.skipped, 0);
         assert_eq!(report.summary.errors, 0);
+    }
+
+    #[test]
+    fn committed_corpus_covers_initial_m3_matrix() {
+        let corpus = load_corpus(&committed_corpus_path()).expect("committed corpus should load");
+        assert!(
+            corpus
+                .fixtures
+                .iter()
+                .any(|fixture| fixture.format == PsdFormat::Psb)
+        );
+
+        for feature in [
+            FixtureFeature::SimplePixelLayers,
+            FixtureFeature::NestedGroups,
+            FixtureFeature::DuplicateLayerNames,
+            FixtureFeature::TextLayers,
+            FixtureFeature::Masks,
+            FixtureFeature::Malformed,
+        ] {
+            assert!(
+                corpus
+                    .fixtures
+                    .iter()
+                    .any(|fixture| fixture.features.contains(&feature)),
+                "missing fixture feature: {feature:?}"
+            );
+        }
     }
 
     #[test]
@@ -607,12 +732,18 @@ mod tests {
                     height: None,
                     layer_count: None,
                     minimum_tree_depth: None,
+                    layer_names: None,
+                    text_layer_count: None,
+                    pixel_mask_layer_count: None,
+                    vector_mask_layer_count: None,
                 },
                 provenance: FixtureProvenance {
                     kind: FixtureProvenanceKind::Synthetic,
                     source: "test".to_owned(),
                     license: None,
                     redistributable: true,
+                    upstream_commit: None,
+                    upstream_path: None,
                 },
             }],
         };
