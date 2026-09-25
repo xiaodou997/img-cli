@@ -139,9 +139,9 @@ report structured result
 
 ## Current status
 
-YuTool has completed the **M2 Engine Manager baseline** and is entering **M3 PSD Engine Spike**.
+YuTool has completed the **M2 Engine Manager baseline** and is now building the **M3 PSD Engine Spike** harness before selecting a PSD engine.
 
-The current runtime includes the Rust core, the built-in raster engine, verified Managed Engine installation/lifecycle, per-engine mutation locking, and unified Built-in/Managed/System discovery. The built-in raster scope remains intentionally small: PNG, JPEG, and WebP.
+The current runtime includes the Rust core, the built-in raster engine, verified Managed Engine installation/lifecycle, per-engine mutation locking, and unified Built-in/Managed/System discovery. M3 adds an engine-neutral PSD fixture/conformance harness and candidate adapter skeletons; no PSD engine has been selected yet. The built-in raster scope remains intentionally small: PNG, JPEG, and WebP.
 
 See:
 

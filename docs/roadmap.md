@@ -122,6 +122,20 @@ M3 may extend YuTool with PSD capabilities and new engines, but should not casua
 
 **Goal:** select a practical PSD/PSB strategy based on fixtures rather than assumptions.
 
+Progress:
+
+- [x] engine-neutral PSD spike harness;
+- [x] fixture corpus schema/provenance rules;
+- [x] initial synthetic malformed fixture;
+- [x] Rust / psd-tools / TypeScript candidate adapter skeletons;
+- [x] machine-readable per-candidate report model;
+- [ ] representative redistributable PSD/PSB fixture corpus;
+- [ ] Rust-native candidate integration(s);
+- [ ] psd-tools candidate integration;
+- [ ] TypeScript/Node candidate integration where useful;
+- [ ] benchmark/conformance comparison report;
+- [ ] PSD engine strategy decision.
+
 Build a representative fixture corpus covering, where legally distributable:
 
 - simple pixel layers;
@@ -216,7 +230,7 @@ Preferred direction: Tauri sharing the Rust core with the CLI.
 
 Only after the engine/runtime architecture is stable should YuTool expand into additional capability families.
 
-Potential areas:
+Potential areas include:
 
 ```text
 PDF
