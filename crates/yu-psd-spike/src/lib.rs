@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::env;
 use std::ffi::OsString;
@@ -17,6 +18,8 @@ pub const RAWPSD_CANDIDATE_VERSION: &str = "0.2.2";
 pub const AG_PSD_CANDIDATE_VERSION: &str = "31.0.2";
 pub const AG_PSD_CANDIDATE_NODE_MAJOR: &str = "22";
 pub const COMPARISON_SCHEMA_VERSION: &str = "1";
+pub const LAYER_EXPORT_SCHEMA_VERSION: &str = "1";
+pub const BENCHMARK_SCHEMA_VERSION: &str = "1";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PsdCorpus {
@@ -506,6 +509,63 @@ pub struct AdapterObservation {
     pub vector_mask_layer_count: Option<usize>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LayerExportObservation {
+    pub layer_name: String,
+    pub width: u32,
+    pub height: u32,
+    pub pixel_format: String,
+    pub rgba_sha256: String,
+    pub rgba_bytes: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LayerExportReport {
+    pub schema_version: String,
+    pub candidate: CandidateDescriptor,
+    pub fixture_id: String,
+    pub observation: LayerExportObservation,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BenchmarkConfig {
+    pub schema_version: String,
+    pub fixture_id: String,
+    pub layer_name: String,
+    pub warmup_iterations: u32,
+    pub sample_iterations: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BenchmarkObservation {
+    pub measurement: String,
+    pub input_read: String,
+    pub runtime_startup: String,
+    pub warmup_iterations: u32,
+    pub sample_iterations: u32,
+    pub inspect_samples_us: Vec<u64>,
+    pub layer_export_samples_us: Vec<u64>,
+    pub layer_export: LayerExportObservation,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BenchmarkStatistics {
+    pub min_us: u64,
+    pub median_us: u64,
+    pub max_us: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CandidateBenchmarkReport {
+    pub schema_version: String,
+    pub candidate: CandidateDescriptor,
+    pub fixture_id: String,
+    pub layer_name: String,
+    pub observation: BenchmarkObservation,
+    pub inspect: BenchmarkStatistics,
+    pub layer_export: BenchmarkStatistics,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AdapterErrorKind {
     Unavailable,
@@ -542,23 +602,49 @@ pub trait PsdCandidateAdapter {
         input: &Path,
         fixture: &PsdFixture,
     ) -> Result<AdapterObservation, AdapterError>;
+
+    fn export_layer(
+        &self,
+        _input: &Path,
+        _fixture: &PsdFixture,
+        _layer_name: &str,
+    ) -> Result<LayerExportObservation, AdapterError> {
+        Err(AdapterError::unavailable(format!(
+            "{} does not implement layer export in the M3 spike harness",
+            self.descriptor().id
+        )))
+    }
+
+    fn benchmark(
+        &self,
+        _input: &Path,
+        _fixture: &PsdFixture,
+        _config: &BenchmarkConfig,
+    ) -> Result<BenchmarkObservation, AdapterError> {
+        Err(AdapterError::unavailable(format!(
+            "{} does not implement the M3 benchmark protocol",
+            self.descriptor().id
+        )))
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default)]
 struct RawPsdCandidateAdapter;
 
 impl RawPsdCandidateAdapter {
-    fn parse(input: &Path) -> Result<AdapterObservation, AdapterError> {
-        let bytes = fs::read(input).map_err(|error| {
+    fn read_input(input: &Path) -> Result<Vec<u8>, AdapterError> {
+        fs::read(input).map_err(|error| {
             AdapterError::execution(format!(
                 "failed to read rawpsd candidate input {}: {error}",
                 input.display()
             ))
-        })?;
+        })
+    }
 
+    fn inspect_bytes(bytes: &[u8]) -> Result<AdapterObservation, AdapterError> {
         let parsed = catch_unwind(AssertUnwindSafe(|| {
-            let metadata = rawpsd::parse_psd_metadata(&bytes)?;
-            let layers = rawpsd::parse_layer_records(&bytes).map_err(|(_, error)| error)?;
+            let metadata = rawpsd::parse_psd_metadata(bytes)?;
+            let layers = rawpsd::parse_layer_records(bytes).map_err(|(_, error)| error)?;
             Ok::<_, String>((metadata, layers))
         }));
 
@@ -616,6 +702,114 @@ impl RawPsdCandidateAdapter {
             vector_mask_layer_count: None,
         })
     }
+
+    fn parse(input: &Path) -> Result<AdapterObservation, AdapterError> {
+        let bytes = Self::read_input(input)?;
+        Self::inspect_bytes(&bytes)
+    }
+
+    fn export_bytes(bytes: &[u8], layer_name: &str) -> Result<LayerExportObservation, AdapterError> {
+        let parsed = catch_unwind(AssertUnwindSafe(|| {
+            rawpsd::parse_layer_records(bytes).map_err(|(_, error)| error)
+        }));
+
+        let layers = match parsed {
+            Ok(Ok(layers)) => layers,
+            Ok(Err(error)) => {
+                return Err(AdapterError::execution(format!(
+                    "rawpsd layer export parse failed: {error}"
+                )));
+            }
+            Err(_) => {
+                return Err(AdapterError::execution(
+                    "rawpsd layer export panicked while parsing input",
+                ));
+            }
+        };
+
+        let mut matches = layers
+            .iter()
+            .filter(|layer| {
+                !layer.group_opener && !layer.group_closer && layer.name == layer_name
+            })
+            .collect::<Vec<_>>();
+
+        if matches.len() != 1 {
+            return Err(AdapterError::execution(format!(
+                "rawpsd layer selector {layer_name:?} matched {} layers; expected exactly one",
+                matches.len()
+            )));
+        }
+
+        let layer = matches.pop().expect("length checked");
+        let expected_bytes = usize::try_from(layer.w)
+            .ok()
+            .and_then(|width| usize::try_from(layer.h).ok().map(|height| (width, height)))
+            .and_then(|(width, height)| width.checked_mul(height))
+            .and_then(|pixels| pixels.checked_mul(4))
+            .ok_or_else(|| AdapterError::execution("rawpsd layer dimensions overflow"))?;
+
+        if layer.image_data_rgba.len() != expected_bytes {
+            return Err(AdapterError::execution(format!(
+                "rawpsd layer {layer_name:?} RGBA byte length mismatch: expected {expected_bytes}, observed {}",
+                layer.image_data_rgba.len()
+            )));
+        }
+
+        let digest = Sha256::digest(&layer.image_data_rgba);
+        Ok(LayerExportObservation {
+            layer_name: layer_name.to_owned(),
+            width: layer.w,
+            height: layer.h,
+            pixel_format: "rgba8".to_owned(),
+            rgba_sha256: format!("{digest:x}"),
+            rgba_bytes: layer.image_data_rgba.len(),
+        })
+    }
+
+    fn elapsed_us(started: Instant) -> u64 {
+        u64::try_from(started.elapsed().as_micros()).unwrap_or(u64::MAX)
+    }
+
+    fn benchmark_bytes(
+        bytes: &[u8],
+        config: &BenchmarkConfig,
+    ) -> Result<BenchmarkObservation, AdapterError> {
+        for _ in 0..config.warmup_iterations {
+            Self::inspect_bytes(bytes)?;
+        }
+
+        let mut inspect_samples_us = Vec::with_capacity(config.sample_iterations as usize);
+        for _ in 0..config.sample_iterations {
+            let started = Instant::now();
+            Self::inspect_bytes(bytes)?;
+            inspect_samples_us.push(Self::elapsed_us(started));
+        }
+
+        for _ in 0..config.warmup_iterations {
+            Self::export_bytes(bytes, &config.layer_name)?;
+        }
+
+        let mut layer_export_samples_us = Vec::with_capacity(config.sample_iterations as usize);
+        let mut layer_export = None;
+        for _ in 0..config.sample_iterations {
+            let started = Instant::now();
+            let observation = Self::export_bytes(bytes, &config.layer_name)?;
+            layer_export_samples_us.push(Self::elapsed_us(started));
+            layer_export = Some(observation);
+        }
+
+        Ok(BenchmarkObservation {
+            measurement: "warm_runtime_operation".to_owned(),
+            input_read: "once_before_timing".to_owned(),
+            runtime_startup: "excluded".to_owned(),
+            warmup_iterations: config.warmup_iterations,
+            sample_iterations: config.sample_iterations,
+            inspect_samples_us,
+            layer_export_samples_us,
+            layer_export: layer_export.expect("sample_iterations is validated as non-zero"),
+        })
+    }
 }
 
 impl PsdCandidateAdapter for RawPsdCandidateAdapter {
@@ -635,6 +829,26 @@ impl PsdCandidateAdapter for RawPsdCandidateAdapter {
         _fixture: &PsdFixture,
     ) -> Result<AdapterObservation, AdapterError> {
         Self::parse(input)
+    }
+
+    fn export_layer(
+        &self,
+        input: &Path,
+        _fixture: &PsdFixture,
+        layer_name: &str,
+    ) -> Result<LayerExportObservation, AdapterError> {
+        let bytes = Self::read_input(input)?;
+        Self::export_bytes(&bytes, layer_name)
+    }
+
+    fn benchmark(
+        &self,
+        input: &Path,
+        _fixture: &PsdFixture,
+        config: &BenchmarkConfig,
+    ) -> Result<BenchmarkObservation, AdapterError> {
+        let bytes = Self::read_input(input)?;
+        Self::benchmark_bytes(&bytes, config)
     }
 }
 
