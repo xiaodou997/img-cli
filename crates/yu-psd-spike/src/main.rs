@@ -3,8 +3,8 @@ use std::fs;
 use std::path::Path;
 use std::process;
 use yu_psd_spike::{
-    benchmark::{run_benchmark, run_benchmark_suite}, candidate_adapters, load_candidate_comparison,
-    load_corpus, run_candidate,
+    benchmark::{run_benchmark, run_benchmark_suite},
+    candidate_adapters, load_candidate_comparison, load_corpus, run_candidate,
 };
 
 fn main() {
@@ -60,7 +60,8 @@ fn run() -> Result<(), String> {
             Ok(())
         }
         [command, suite] if command == "benchmark-suite" => {
-            let report = run_benchmark_suite(Path::new(suite)).map_err(|error| error.to_string())?;
+            let report =
+                run_benchmark_suite(Path::new(suite)).map_err(|error| error.to_string())?;
             let json = serde_json::to_string_pretty(&report)
                 .map_err(|error| format!("failed to serialize benchmark suite report: {error}"))?;
             println!("{json}");
@@ -70,8 +71,9 @@ fn run() -> Result<(), String> {
             let report = run_benchmark_suite(Path::new(suite)).map_err(|error| error.to_string())?;
             let json = serde_json::to_string_pretty(&report)
                 .map_err(|error| format!("failed to serialize benchmark suite report: {error}"))?;
-            fs::write(output, format!("{json}\n"))
-                .map_err(|error| format!("failed to write benchmark suite report {output}: {error}"))?;
+            fs::write(output, format!("{json}\n")).map_err(|error| {
+                format!("failed to write benchmark suite report {output}: {error}")
+            })?;
             println!("wrote PSD benchmark suite report to {output}");
             Ok(())
         }
