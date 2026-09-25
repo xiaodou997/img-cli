@@ -102,7 +102,9 @@ A commit date alone is not a quality or sustainability rating. It is retained so
 
 ## Performance and memory
 
-**Not measured in PR #15.**
+**PR #15 does not contain measured performance results.**
+
+PR #16 adds the measurement harness, but the comparison snapshot intentionally remains `benchmark.status = not_measured` until controlled benchmark evidence is recorded.
 
 The durations currently emitted by `yu-psd-spike` are unsuitable for cross-engine benchmarking because:
 
