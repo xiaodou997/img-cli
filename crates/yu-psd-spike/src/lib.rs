@@ -393,11 +393,7 @@ pub fn validate_candidate_comparison(
         RAWPSD_CANDIDATE_VERSION,
         4,
         3,
-        &[
-            "layer-masks",
-            "simple-pixel-layers-psb",
-            "text-layer",
-        ],
+        &["layer-masks", "simple-pixel-layers-psb", "text-layer"],
     )?;
     validate_comparison_baseline(
         comparison,
