@@ -891,8 +891,7 @@ mod tests {
     }
 
     fn controlled_report_path() -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../docs/data/psd-benchmark-report-v2.json")
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/data/psd-benchmark-report-v2.json")
     }
 
     #[test]
