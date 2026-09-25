@@ -1,7 +1,6 @@
 use crate::{
     EngineManager, INSTALL_METADATA_FILE, InstalledEngineMetadata, LIFECYCLE_SCHEMA_VERSION,
-    ManagerError, validate_identifier, validate_relative_entrypoint,
-    validate_version_segment,
+    ManagerError, validate_identifier, validate_relative_entrypoint, validate_version_segment,
 };
 use serde::{Deserialize, Serialize};
 use std::{
