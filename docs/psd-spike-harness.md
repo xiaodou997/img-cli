@@ -78,17 +78,45 @@ The observation currently carries the comparison primitives required for the fir
 
 The contract can be extended as the corpus starts testing masks, text, Smart Objects, export, and rendering. New fields should be driven by actual comparison needs rather than one candidate's native API.
 
-## Candidate skeletons
+## Candidate status
 
-PR #10 registers three intentionally unwired candidates:
+PR #10 registered three candidate slots. PR #12 wires only the psd-tools reference candidate:
 
-| Candidate ID | Runtime family | PR #10 behavior |
+| Candidate ID | Runtime family | Current behavior |
 | --- | --- | --- |
-| `rust-native` | Rust | skipped / unavailable |
-| `psd-tools` | Python | skipped / unavailable |
-| `typescript-psd` | TypeScript/Node | skipped / unavailable |
+| `rust-native` | Rust | skeleton / unavailable |
+| `psd-tools` | Python | wired reference adapter |
+| `typescript-psd` | TypeScript/Node | skeleton / unavailable |
 
-An unwired adapter returns an explicit `unavailable` result. It is never treated as a passing implementation and none of the three candidates becomes the default by being listed first.
+A skeleton returns an explicit `unavailable` result. Wiring psd-tools as the first reference candidate does not select it as YuTool's default PSD engine.
+
+### psd-tools reference runtime
+
+The reference environment is intentionally pinned:
+
+```text
+Python 3.12
+psd-tools 1.20.0
+```
+
+The Rust harness invokes `crates/yu-psd-spike/adapters/psd_tools_reference.py` through argv without shell interpolation. The adapter refuses a different Python minor version or psd-tools version so comparison runs do not silently drift.
+
+The interpreter defaults to `python`. Set `YU_PSD_TOOLS_PYTHON` to an explicit Python executable when needed.
+
+YuTool does not install this Python environment during normal runtime or normal Rust CI. The dedicated `PSD Spike` workflow creates the pinned reference environment only for conformance testing and runs it on Ubuntu, macOS, and Windows.
+
+Adapter normalization currently maps psd-tools into:
+
+- parse success/rejection;
+- document width and height;
+- logical layer count;
+- maximum tree depth;
+- layer names;
+- text-layer count;
+- pixel-mask count;
+- vector-mask count.
+
+A PSD parse exception is represented as `parse_success=false`; missing Python, missing psd-tools, or version mismatch is `unavailable`; process/protocol failures are `error`.
 
 ## Commands
 
@@ -110,11 +138,11 @@ Produce a report for one candidate:
 cargo run -p yu-psd-spike -- run psd-tools fixtures/psd/corpus.json
 ```
 
-Until a candidate adapter is wired, its fixture results are `skipped` with an explicit diagnostic.
+For `psd-tools`, the command runs the pinned reference adapter when its Python environment is available. If the pinned runtime is absent or mismatched, fixture results are `skipped` with an explicit `unavailable` diagnostic. Rust-native and TypeScript candidates remain skeletons.
 
 ## CI contract
 
-The normal workspace gate is sufficient for PR #10:
+The normal workspace gate remains independent of optional PSD runtimes:
 
 ```bash
 cargo fmt --all -- --check
@@ -123,7 +151,9 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
-Tests cover corpus validation, expected-rejection semantics, path traversal rejection, and the fact that all PR #10 candidates remain explicit skeletons.
+PR #12 adds a separate three-platform `PSD Spike` gate. It installs Python 3.12 + psd-tools 1.20.0 and runs the ignored reference-conformance test against all seven corpus fixtures.
+
+Normal tests cover corpus validation, expected comparison semantics, path traversal rejection, the two remaining skeleton adapters, and graceful `unavailable` behavior when the reference Python runtime is missing.
 
 ## Follow-up direction
 

@@ -133,7 +133,7 @@ Progress:
 - [x] machine-readable per-candidate report model;
 - [ ] representative redistributable PSD/PSB fixture corpus;
 - [ ] Rust-native candidate integration(s);
-- [ ] psd-tools candidate integration;
+- [x] psd-tools 1.20.0 reference candidate integration (Python 3.12);
 - [ ] TypeScript/Node candidate integration where useful;
 - [ ] benchmark/conformance comparison report;
 - [ ] PSD engine strategy decision.

@@ -1,12 +1,17 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+use std::env;
+use std::ffi::OsString;
 use std::fmt;
 use std::fs;
-use std::path::{Component, Path};
+use std::path::{Component, Path, PathBuf};
+use std::process::Command;
 use std::time::Instant;
 
 pub const CORPUS_SCHEMA_VERSION: &str = "1";
 pub const REPORT_SCHEMA_VERSION: &str = "1";
+pub const PSD_TOOLS_REFERENCE_VERSION: &str = "1.20.0";
+pub const PSD_TOOLS_REFERENCE_PYTHON: &str = "3.12";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PsdCorpus {
@@ -331,9 +336,89 @@ impl PsdCandidateAdapter for SkeletonAdapter {
         _fixture: &PsdFixture,
     ) -> Result<AdapterObservation, AdapterError> {
         Err(AdapterError::unavailable(format!(
-            "{} is a PR #10 adapter skeleton and is not wired to an engine yet",
+            "{} is an M3 adapter skeleton and is not wired to an engine yet",
             self.descriptor.id
         )))
+    }
+}
+
+#[derive(Debug, Clone)]
+struct PsdToolsReferenceAdapter {
+    python: OsString,
+}
+
+impl Default for PsdToolsReferenceAdapter {
+    fn default() -> Self {
+        let python = env::var_os("YU_PSD_TOOLS_PYTHON")
+            .filter(|value| !value.is_empty())
+            .unwrap_or_else(|| OsString::from("python"));
+        Self { python }
+    }
+}
+
+impl PsdToolsReferenceAdapter {
+    #[cfg(test)]
+    fn with_python(python: impl Into<OsString>) -> Self {
+        Self {
+            python: python.into(),
+        }
+    }
+
+    fn script_path() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters/psd_tools_reference.py")
+    }
+}
+
+impl PsdCandidateAdapter for PsdToolsReferenceAdapter {
+    fn descriptor(&self) -> CandidateDescriptor {
+        CandidateDescriptor {
+            id: "psd-tools".to_owned(),
+            display_name: format!("psd-tools {PSD_TOOLS_REFERENCE_VERSION} reference"),
+            runtime: CandidateRuntime::Python,
+            status: CandidateStatus::Wired,
+            notes: format!(
+                "Reference adapter pinned to Python {PSD_TOOLS_REFERENCE_PYTHON} + psd-tools {PSD_TOOLS_REFERENCE_VERSION}; set YU_PSD_TOOLS_PYTHON to select the interpreter."
+            ),
+        }
+    }
+
+    fn inspect(
+        &self,
+        input: &Path,
+        _fixture: &PsdFixture,
+    ) -> Result<AdapterObservation, AdapterError> {
+        let output = Command::new(&self.python)
+            .arg(Self::script_path())
+            .arg("--expected-version")
+            .arg(PSD_TOOLS_REFERENCE_VERSION)
+            .arg("--expected-python")
+            .arg(PSD_TOOLS_REFERENCE_PYTHON)
+            .arg(input)
+            .output()
+            .map_err(|error| {
+                AdapterError::unavailable(format!(
+                    "failed to start psd-tools reference Python {:?}: {error}",
+                    self.python
+                ))
+            })?;
+
+        if !output.status.success() {
+            let diagnostic = String::from_utf8_lossy(&output.stderr).trim().to_owned();
+            let diagnostic = if diagnostic.is_empty() {
+                format!("psd-tools reference adapter exited with {}", output.status)
+            } else {
+                diagnostic
+            };
+
+            if output.status.code() == Some(3) {
+                return Err(AdapterError::unavailable(diagnostic));
+            }
+            return Err(AdapterError::execution(diagnostic));
+        }
+
+        serde_json::from_slice::<AdapterObservation>(&output.stdout).map_err(|error| {
+            AdapterError::execution(format!("invalid psd-tools reference adapter JSON: {error}"))
+        })
     }
 }
 
@@ -345,12 +430,7 @@ pub fn candidate_adapters() -> Vec<Box<dyn PsdCandidateAdapter>> {
             CandidateRuntime::RustNative,
             "Reserved for Rust PSD implementations evaluated during M3.",
         )),
-        Box::new(SkeletonAdapter::new(
-            "psd-tools",
-            "psd-tools candidate",
-            CandidateRuntime::Python,
-            "Reserved for the Python psd-tools compatibility candidate.",
-        )),
+        Box::new(PsdToolsReferenceAdapter::default()),
         Box::new(SkeletonAdapter::new(
             "typescript-psd",
             "TypeScript PSD candidate",
@@ -701,20 +781,75 @@ mod tests {
     }
 
     #[test]
-    fn candidate_skeletons_skip_without_selecting_an_engine() {
+    fn remaining_candidate_skeletons_skip_without_selecting_an_engine() {
         let fixture_count = load_corpus(&committed_corpus_path())
             .expect("committed corpus should load")
             .fixtures
             .len();
+        let skeletons = candidate_adapters()
+            .into_iter()
+            .filter(|adapter| adapter.descriptor().status == CandidateStatus::Skeleton)
+            .collect::<Vec<_>>();
 
-        for adapter in candidate_adapters() {
+        assert_eq!(skeletons.len(), 2);
+        for adapter in skeletons {
             let report = run_candidate(&committed_corpus_path(), adapter.as_ref())
                 .expect("skeleton adapter should produce a report");
-            assert_eq!(report.candidate.status, CandidateStatus::Skeleton);
             assert_eq!(report.summary.skipped, fixture_count);
             assert_eq!(report.summary.failed, 0);
             assert_eq!(report.summary.errors, 0);
         }
+    }
+
+    #[test]
+    fn psd_tools_candidate_is_wired_but_optional() {
+        let adapter = candidate_adapters()
+            .into_iter()
+            .find(|adapter| adapter.descriptor().id == "psd-tools")
+            .expect("psd-tools candidate must be registered");
+        let descriptor = adapter.descriptor();
+
+        assert_eq!(descriptor.status, CandidateStatus::Wired);
+        assert_eq!(descriptor.runtime, CandidateRuntime::Python);
+        assert!(descriptor.notes.contains(PSD_TOOLS_REFERENCE_VERSION));
+        assert!(descriptor.notes.contains(PSD_TOOLS_REFERENCE_PYTHON));
+    }
+
+    #[test]
+    fn psd_tools_missing_python_is_reported_as_unavailable() {
+        let corpus = load_corpus(&committed_corpus_path()).expect("committed corpus should load");
+        let fixture = corpus
+            .fixtures
+            .first()
+            .expect("committed corpus must contain a fixture");
+        let root = committed_corpus_path()
+            .parent()
+            .expect("corpus path must have a parent")
+            .to_path_buf();
+        let adapter =
+            PsdToolsReferenceAdapter::with_python("yu-psd-spike-definitely-missing-python-runtime");
+
+        let error = adapter
+            .inspect(&root.join(&fixture.path), fixture)
+            .expect_err("missing Python must not be treated as execution success");
+        assert_eq!(error.kind, AdapterErrorKind::Unavailable);
+    }
+
+    #[test]
+    #[ignore = "requires Python 3.12 with psd-tools 1.20.0"]
+    fn psd_tools_reference_matches_committed_corpus() {
+        let adapter = PsdToolsReferenceAdapter::default();
+        let report = run_candidate(&committed_corpus_path(), &adapter)
+            .expect("psd-tools reference adapter should produce a report");
+
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&report).expect("report should serialize")
+        );
+        assert_eq!(report.summary.passed, 7);
+        assert_eq!(report.summary.failed, 0);
+        assert_eq!(report.summary.skipped, 0);
+        assert_eq!(report.summary.errors, 0);
     }
 
     #[test]
