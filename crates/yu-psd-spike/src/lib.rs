@@ -390,6 +390,8 @@ impl PsdCandidateAdapter for PsdToolsReferenceAdapter {
             .arg(Self::script_path())
             .arg("--expected-version")
             .arg(PSD_TOOLS_REFERENCE_VERSION)
+            .arg("--expected-python")
+            .arg(PSD_TOOLS_REFERENCE_PYTHON)
             .arg(input)
             .output()
             .map_err(|error| {
