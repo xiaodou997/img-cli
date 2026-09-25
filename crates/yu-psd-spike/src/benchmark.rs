@@ -52,6 +52,8 @@ pub struct CandidateBenchmarkReport {
     pub cold_inspect: DurationOperationReport,
     pub warm_parse: DurationOperationReport,
     pub layer_export_materialize: LayerExportOperationReport,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub peak_rss_bytes: Option<u64>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -105,6 +107,7 @@ struct ExternalBenchmarkObservation {
     exported_layer_count: usize,
     total_rgba_bytes: usize,
     export_checksum_sha256: String,
+    peak_rss_bytes: u64,
 }
 
 pub fn load_benchmark_plan(path: &Path) -> Result<BenchmarkPlan, CorpusError> {
@@ -239,13 +242,18 @@ pub fn run_benchmark(corpus_path: &Path, plan_path: &Path) -> Result<BenchmarkRe
             plan.measured_iterations,
         );
 
-        let (warm_parse, layer_export_materialize) = match descriptor.id.as_str() {
-            "rust-native" => (
-                run_rawpsd_warm_parse(&input, plan.warmup_iterations, plan.measured_iterations),
-                unsupported_layer_export(
-                    "rawpsd 0.2.2 exposes low-level image data but the M3 adapter does not yet provide a normalized RGBA layer-export contract",
-                ),
-            ),
+        let (warm_parse, layer_export_materialize, peak_rss_bytes) = match descriptor.id.as_str() {
+            "rust-native" => {
+                let warm_parse =
+                    run_rawpsd_warm_parse(&input, plan.warmup_iterations, plan.measured_iterations);
+                (
+                    warm_parse,
+                    unsupported_layer_export(
+                        "rawpsd 0.2.2 exposes low-level image data but the M3 adapter does not yet provide a normalized RGBA layer-export contract",
+                    ),
+                    process_peak_rss_bytes(),
+                )
+            }
             "psd-tools" => match run_psd_tools_external(
                 &input,
                 plan.warmup_iterations,
@@ -272,6 +280,7 @@ pub fn run_benchmark(corpus_path: &Path, plan_path: &Path) -> Result<BenchmarkRe
             cold_inspect,
             warm_parse,
             layer_export_materialize,
+            peak_rss_bytes,
         });
     }
 
@@ -508,7 +517,11 @@ fn run_external_command(
 
 fn external_reports(
     observation: ExternalBenchmarkObservation,
-) -> (DurationOperationReport, LayerExportOperationReport) {
+) -> (
+    DurationOperationReport,
+    LayerExportOperationReport,
+    Option<u64>,
+) {
     let warm_parse = measured_duration(observation.warm_parse_samples_ms);
     let samples_ms = observation.layer_export_samples_ms;
     let summary = summarize_samples(&samples_ms);
@@ -524,13 +537,18 @@ fn external_reports(
             export_checksum_sha256: Some(observation.export_checksum_sha256),
             diagnostic: None,
         },
+        Some(observation.peak_rss_bytes),
     )
 }
 
 fn external_failure_reports(
     status: BenchmarkStatus,
     diagnostic: String,
-) -> (DurationOperationReport, LayerExportOperationReport) {
+) -> (
+    DurationOperationReport,
+    LayerExportOperationReport,
+    Option<u64>,
+) {
     (
         failed_duration(status, diagnostic.clone()),
         LayerExportOperationReport {
@@ -542,6 +560,7 @@ fn external_failure_reports(
             export_checksum_sha256: None,
             diagnostic: Some(diagnostic),
         },
+        None,
     )
 }
 
@@ -608,6 +627,49 @@ fn summarize_samples(samples: &[f64]) -> Option<DurationSummary> {
     })
 }
 
+#[cfg(unix)]
+fn process_peak_rss_bytes() -> Option<u64> {
+    let mut usage = std::mem::MaybeUninit::<libc::rusage>::zeroed();
+    let result = unsafe { libc::getrusage(libc::RUSAGE_SELF, usage.as_mut_ptr()) };
+    if result != 0 {
+        return None;
+    }
+    let usage = unsafe { usage.assume_init() };
+    let raw = u64::try_from(usage.ru_maxrss).ok()?;
+
+    #[cfg(target_os = "macos")]
+    {
+        Some(raw)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        raw.checked_mul(1024)
+    }
+}
+
+#[cfg(windows)]
+fn process_peak_rss_bytes() -> Option<u64> {
+    use windows_sys::Win32::System::ProcessStatus::{
+        GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS,
+    };
+    use windows_sys::Win32::System::Threading::GetCurrentProcess;
+
+    let mut counters = std::mem::MaybeUninit::<PROCESS_MEMORY_COUNTERS>::zeroed();
+    let size = u32::try_from(std::mem::size_of::<PROCESS_MEMORY_COUNTERS>()).ok()?;
+    let handle = unsafe { GetCurrentProcess() };
+    let ok = unsafe { GetProcessMemoryInfo(handle, counters.as_mut_ptr(), size) };
+    if ok == 0 {
+        return None;
+    }
+    let counters = unsafe { counters.assume_init() };
+    u64::try_from(counters.PeakWorkingSetSize).ok()
+}
+
+#[cfg(not(any(unix, windows)))]
+fn process_peak_rss_bytes() -> Option<u64> {
+    None
+}
+
 fn validate_benchmark_report(
     report: &BenchmarkReport,
     plan: &BenchmarkPlan,
@@ -643,6 +705,12 @@ fn validate_benchmark_report(
             &candidate.warm_parse,
             expected_samples,
         )?;
+        if candidate.peak_rss_bytes.unwrap_or(0) == 0 {
+            return Err(CorpusError::new(format!(
+                "PSD benchmark candidate {} did not report peak RSS",
+                candidate.candidate.id
+            )));
+        }
 
         if export_selected.contains(&candidate.candidate.id) {
             let export = &candidate.layer_export_materialize;
