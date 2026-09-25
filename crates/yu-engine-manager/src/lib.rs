@@ -1,8 +1,13 @@
 mod installer;
+mod lifecycle;
 
 pub use installer::{
     DEFAULT_MAX_DOWNLOAD_BYTES, DEFAULT_MAX_EXTRACTED_BYTES, DEFAULT_MAX_EXTRACTED_FILES,
     Downloader, EngineInstaller, HttpDownloader, InstallLimits, InstallReceipt, sha256_file,
+};
+pub use lifecycle::{
+    ActivationReceipt, DeactivationReceipt, INSTALL_METADATA_FILE, InstalledEngineMetadata,
+    InstalledVersion, LIFECYCLE_SCHEMA_VERSION, RemovalReceipt,
 };
 
 use serde::{Deserialize, Serialize};
@@ -295,6 +300,10 @@ pub enum ManagerError {
     InvalidManifest(String),
     Incompatible(String),
     AlreadyInstalled(String),
+    NotInstalled(String),
+    Ownership(String),
+    ActiveVersion(String),
+    State(String),
     Download(String),
     Integrity(String),
     Archive(String),
@@ -308,6 +317,12 @@ impl fmt::Display for ManagerError {
             Self::InvalidManifest(message) => write!(f, "invalid engine manifest: {message}"),
             Self::Incompatible(message) => write!(f, "engine package is incompatible: {message}"),
             Self::AlreadyInstalled(message) => write!(f, "engine is already installed: {message}"),
+            Self::NotInstalled(message) => write!(f, "engine is not installed: {message}"),
+            Self::Ownership(message) => write!(f, "engine ownership violation: {message}"),
+            Self::ActiveVersion(message) => {
+                write!(f, "active engine version cannot be removed: {message}")
+            }
+            Self::State(message) => write!(f, "engine lifecycle state is invalid: {message}"),
             Self::Download(message) => write!(f, "engine download failed: {message}"),
             Self::Integrity(message) => write!(f, "engine integrity check failed: {message}"),
             Self::Archive(message) => write!(f, "engine archive rejected: {message}"),

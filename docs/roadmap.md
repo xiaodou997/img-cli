@@ -79,8 +79,9 @@ Progress:
 - [x] checksum/integrity verification;
 - [x] safe archive extraction;
 - [x] atomic activation;
-- [ ] version discovery;
-- [ ] uninstall;
+- [x] installed version discovery;
+- [x] active/current version state;
+- [x] managed version removal;
 - [x] system executable discovery foundation;
 - [x] managed engine state diagnostics.
 

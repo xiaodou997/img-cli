@@ -1,4 +1,7 @@
-use crate::{ArchiveKind, EngineManager, EngineManifest, EnginePackage, ManagerError};
+use crate::{
+    ArchiveKind, EngineManager, EngineManifest, EnginePackage, ManagerError,
+    lifecycle::write_install_metadata,
+};
 use flate2::read::GzDecoder;
 use reqwest::blocking::Client;
 use serde::Serialize;
@@ -258,6 +261,7 @@ where
         }
 
         make_entrypoint_executable(&staged_entrypoint)?;
+        write_install_metadata(payload, manifest, package, &actual_sha256)?;
 
         if final_dir.exists() {
             return Err(ManagerError::AlreadyInstalled(format!(
@@ -724,6 +728,26 @@ mod tests {
 
         let descriptor = installer.manager().managed_descriptor(&manifest).unwrap();
         assert_eq!(descriptor.state, yu_engine_api::EngineState::Ready);
+        assert!(
+            receipt
+                .entrypoint
+                .parent()
+                .unwrap()
+                .parent()
+                .unwrap()
+                .join(crate::INSTALL_METADATA_FILE)
+                .is_file()
+        );
+
+        let activation = installer
+            .manager()
+            .activate_version(&descriptor, &manifest.version)
+            .unwrap();
+        assert_eq!(activation.active_version, manifest.version);
+        assert_eq!(
+            installer.manager().active_version(&descriptor).unwrap(),
+            Some(manifest.version.clone())
+        );
 
         let _ = fs::remove_dir_all(root);
     }
