@@ -233,6 +233,31 @@ impl RuntimeRegistry {
                 engines: vec!["yu-runtime".to_owned()],
             },
             CapabilityDescriptor {
+                id: "engine.install".to_owned(),
+                summary: "Install a managed engine from a manifest.".to_owned(),
+                engines: vec!["yu-runtime".to_owned()],
+            },
+            CapabilityDescriptor {
+                id: "engine.versions".to_owned(),
+                summary: "List installed managed-engine versions.".to_owned(),
+                engines: vec!["yu-runtime".to_owned()],
+            },
+            CapabilityDescriptor {
+                id: "engine.activate".to_owned(),
+                summary: "Activate an installed managed-engine version.".to_owned(),
+                engines: vec!["yu-runtime".to_owned()],
+            },
+            CapabilityDescriptor {
+                id: "engine.deactivate".to_owned(),
+                summary: "Deactivate a managed engine.".to_owned(),
+                engines: vec!["yu-runtime".to_owned()],
+            },
+            CapabilityDescriptor {
+                id: "engine.remove".to_owned(),
+                summary: "Remove an inactive managed-engine version.".to_owned(),
+                engines: vec!["yu-runtime".to_owned()],
+            },
+            CapabilityDescriptor {
                 id: "image.info".to_owned(),
                 summary: "Inspect a raster image.".to_owned(),
                 engines: vec!["raster-rs".to_owned()],
@@ -255,6 +280,11 @@ impl RuntimeRegistry {
                     "runtime.doctor".to_owned(),
                     "runtime.capabilities".to_owned(),
                     "engine.list".to_owned(),
+                    "engine.install".to_owned(),
+                    "engine.versions".to_owned(),
+                    "engine.activate".to_owned(),
+                    "engine.deactivate".to_owned(),
+                    "engine.remove".to_owned(),
                 ],
             },
             EngineDescriptor {
@@ -398,6 +428,11 @@ mod tests {
                 "runtime.doctor",
                 "runtime.capabilities",
                 "engine.list",
+                "engine.install",
+                "engine.versions",
+                "engine.activate",
+                "engine.deactivate",
+                "engine.remove",
                 "image.info",
                 "image.resize"
             ]

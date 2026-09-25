@@ -1,5 +1,6 @@
 mod installer;
 mod lifecycle;
+mod lock;
 
 pub use installer::{
     DEFAULT_MAX_DOWNLOAD_BYTES, DEFAULT_MAX_EXTRACTED_BYTES, DEFAULT_MAX_EXTRACTED_FILES,
@@ -303,6 +304,7 @@ pub enum ManagerError {
     NotInstalled(String),
     Ownership(String),
     ActiveVersion(String),
+    Busy(String),
     State(String),
     Download(String),
     Integrity(String),
@@ -322,6 +324,7 @@ impl fmt::Display for ManagerError {
             Self::ActiveVersion(message) => {
                 write!(f, "active engine version cannot be removed: {message}")
             }
+            Self::Busy(message) => write!(f, "engine mutation is busy: {message}"),
             Self::State(message) => write!(f, "engine lifecycle state is invalid: {message}"),
             Self::Download(message) => write!(f, "engine download failed: {message}"),
             Self::Integrity(message) => write!(f, "engine integrity check failed: {message}"),

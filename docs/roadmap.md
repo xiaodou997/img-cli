@@ -82,6 +82,8 @@ Progress:
 - [x] installed version discovery;
 - [x] active/current version state;
 - [x] managed version removal;
+- [x] inter-process engine mutation lock;
+- [x] public managed-engine CLI;
 - [x] system executable discovery foundation;
 - [x] managed engine state diagnostics.
 
@@ -89,8 +91,11 @@ CLI target:
 
 ```bash
 yu engine list
-yu engine install <engine>
-yu engine remove <engine>
+yu engine install --manifest <file>
+yu engine versions <engine>
+yu engine activate <engine> <version>
+yu engine deactivate <engine>
+yu engine remove <engine> <version>
 yu doctor
 ```
 

@@ -188,6 +188,7 @@ where
 
     pub fn install(&self, manifest: &EngineManifest) -> Result<InstallReceipt, ManagerError> {
         manifest.validate()?;
+        let _lock = self.manager.acquire_engine_lock(&manifest.id)?;
 
         let package = manifest.package_for(self.manager.target()).ok_or_else(|| {
             ManagerError::Incompatible(format!(
